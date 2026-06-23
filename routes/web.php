@@ -1,16 +1,15 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\SaleController;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Auth;
 
-// Ruta raíz dinámica
-Route::get('/', function () {
-    if (Auth::check()) {
-        return view('dashboard');
-    }
-    return redirect()->route('login');
-})->name('dashboard');
+// Rutas protegidas (requieren inicio de sesión)
+Route::middleware('auth')->group(function () {
+    Route::get('/', [SaleController::class, 'index'])->name('dashboard');
+    Route::post('/sales/import', [SaleController::class, 'import'])->name('sales.import');
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+});
 
 // Rutas de invitados (no autenticados)
 Route::middleware('guest')->group(function () {
@@ -18,9 +17,5 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
 });
 
-// Rutas protegidas (autenticados)
-Route::middleware('auth')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-});
 
 
