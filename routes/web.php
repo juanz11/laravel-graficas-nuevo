@@ -1,15 +1,26 @@
 <?php
 
+use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
 
+// Ruta raíz dinámica
 Route::get('/', function () {
-    return view('welcome');
+    if (Auth::check()) {
+        return view('dashboard');
+    }
+    return redirect()->route('login');
+})->name('dashboard');
+
+// Rutas de invitados (no autenticados)
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
+    Route::post('/login', [AuthController::class, 'login']);
 });
 
-Route::get('/login', function () {
-    return view('login');
-})->name('login');
+// Rutas protegidas (autenticados)
+Route::middleware('auth')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+});
 
-Route::get('/register', function () {
-    return view('register');
-})->name('register');
+
