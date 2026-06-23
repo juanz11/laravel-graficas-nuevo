@@ -30,16 +30,23 @@ class SaleController extends Controller
             ];
         });
 
-        // 2. Determinar el mes seleccionado (por defecto el último disponible, o el actual si no hay datos)
-        $selectedMonthVal = $request->input('month');
-        if (!$selectedMonthVal && $availableDates->isNotEmpty()) {
-            $selectedMonthVal = $availableDates->first()->format('Y-m-d');
-        } elseif (!$selectedMonthVal) {
-            $selectedMonthVal = now()->startOfMonth()->format('Y-m-d');
+        // 2. Determinar el mes seleccionado
+        $selectedMonthVal = null;
+        if ($request->has('month')) {
+            $selectedMonthVal = $request->input('month'); // puede ser "" para "Todos los meses"
+        } else {
+            // Por defecto en la primera carga, mostramos el último mes disponible
+            if ($availableDates->isNotEmpty()) {
+                $selectedMonthVal = $availableDates->first()->format('Y-m-d');
+            }
         }
 
-        $selectedMonth = Carbon::parse($selectedMonthVal);
-        $selectedMonthLabel = $this->getSpanishMonthName($selectedMonth->month) . ' ' . $selectedMonth->year;
+        if ($selectedMonthVal) {
+            $selectedMonth = Carbon::parse($selectedMonthVal);
+            $selectedMonthLabel = $this->getSpanishMonthName($selectedMonth->month) . ' ' . $selectedMonth->year;
+        } else {
+            $selectedMonthLabel = 'Todos los meses';
+        }
 
         // 3. Obtener filtros
         $selectedClient = $request->input('client');
@@ -48,7 +55,10 @@ class SaleController extends Controller
         $viewType = $request->input('view_type', 'units'); // 'units' or 'sales'
 
         // 4. Consultar los datos filtrados por mes y filtros adicionales
-        $query = Sale::where('report_date', $selectedMonthVal);
+        $query = Sale::query();
+        if ($selectedMonthVal) {
+            $query->where('report_date', $selectedMonthVal);
+        }
         
         if ($selectedClient) {
             $query->where('client_code', $selectedClient);
@@ -79,14 +89,21 @@ class SaleController extends Controller
         ];
 
         // 6. Agrupar ventas por Clase de cliente (sin filtros de cliente/producto para mostrar distribución general)
-        $salesByClass = Sale::where('report_date', $selectedMonthVal)
+        $classQuery = Sale::query();
+        if ($selectedMonthVal) {
+            $classQuery->where('report_date', $selectedMonthVal);
+        }
+        $salesByClass = $classQuery
             ->select('client_class', DB::raw('SUM(total_sales) as total_sales'), DB::raw('SUM(quantity) as total_qty'))
             ->groupBy('client_class')
             ->orderBy($viewType === 'units' ? 'total_qty' : 'total_sales', 'desc')
             ->get();
 
         // 7. Agrupar ventas por Cliente (respetando filtros de producto y clase si existen)
-        $clientQuery = Sale::where('report_date', $selectedMonthVal);
+        $clientQuery = Sale::query();
+        if ($selectedMonthVal) {
+            $clientQuery->where('report_date', $selectedMonthVal);
+        }
         if ($selectedClass) {
             $clientQuery->where('client_class', $selectedClass);
         }
@@ -110,7 +127,10 @@ class SaleController extends Controller
         })->sortByDesc($viewType === 'units' ? 'total_qty' : 'total_sales')->values();
 
         // 8. Agrupar ventas por Producto (para gráfica de productos top, respetando filtros de cliente y clase si existen)
-        $productQuery = Sale::where('report_date', $selectedMonthVal);
+        $productQuery = Sale::query();
+        if ($selectedMonthVal) {
+            $productQuery->where('report_date', $selectedMonthVal);
+        }
         if ($selectedClient) {
             $productQuery->where('client_code', $selectedClient);
         }
@@ -155,7 +175,10 @@ class SaleController extends Controller
             });
 
         // 10. Obtener lista de clientes para el filtro (respetando la clase seleccionada si existe)
-        $clientsQuery = Sale::where('report_date', $selectedMonthVal);
+        $clientsQuery = Sale::query();
+        if ($selectedMonthVal) {
+            $clientsQuery->where('report_date', $selectedMonthVal);
+        }
         if ($selectedClass) {
             $clientsQuery->where('client_class', $selectedClass);
         }
@@ -171,7 +194,11 @@ class SaleController extends Controller
             });
 
         // 11. Obtener lista de clases únicas para el selector de filtros
-        $classesList = Sale::where('report_date', $selectedMonthVal)
+        $classesQuery = Sale::query();
+        if ($selectedMonthVal) {
+            $classesQuery->where('report_date', $selectedMonthVal);
+        }
+        $classesList = $classesQuery
             ->whereNotNull('client_class')
             ->where('client_class', '!=', '')
             ->select('client_class')
