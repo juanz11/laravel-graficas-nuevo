@@ -389,9 +389,6 @@
                                         <th class="px-6 py-3.5">Descripción</th>
                                         <th class="px-6 py-3.5 text-right">Cant. Vendida</th>
                                         <th class="px-6 py-3.5 text-right">Ventas (Bs)</th>
-                                        <th class="px-6 py-3.5 text-right">Costo (Bs)</th>
-                                        <th class="px-6 py-3.5 text-right">Utilidad (Bs)</th>
-                                        <th class="px-6 py-3.5 text-center">Utilidad %</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-white/5 text-xs text-gray-300">
@@ -401,13 +398,6 @@
                                             <td class="px-6 py-3 text-white font-medium">{{ $item->product_description }}</td>
                                             <td class="px-6 py-3 text-right">{{ number_format($item->quantity, 0, ',', '.') }}</td>
                                             <td class="px-6 py-3 text-right font-semibold text-white">Bs. {{ number_format($item->total_sales, 2, ',', '.') }}</td>
-                                            <td class="px-6 py-3 text-right">Bs. {{ number_format($item->total_cost, 2, ',', '.') }}</td>
-                                            <td class="px-6 py-3 text-right text-emerald-400">Bs. {{ number_format($item->total_utility, 2, ',', '.') }}</td>
-                                            <td class="px-6 py-3 text-center">
-                                                <span class="px-2 py-0.5 rounded-full font-bold text-[10px] {{ $item->utility_percentage >= 50 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-yellow-500/10 text-yellow-400' }}">
-                                                    {{ number_format($item->utility_percentage, 2, ',', '.') }}%
-                                                </span>
-                                            </td>
                                         </tr>
                                     @endforeach
                                 </tbody>
