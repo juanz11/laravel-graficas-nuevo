@@ -48,6 +48,15 @@
     <div class="absolute top-0 right-0 w-[500px] h-[500px] rounded-full bg-indigo-500/5 blur-[120px] pointer-events-none"></div>
     <div class="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full bg-purple-500/5 blur-[120px] pointer-events-none"></div>
 
+    <!-- Floating Exit Fullscreen Button (hidden by default) -->
+    <button id="exit-fullscreen-btn" onclick="toggleFullscreen()" 
+        class="fixed top-4 right-4 z-[100] hidden px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-xl shadow-lg transition-all flex items-center space-x-2">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+        <span>Salir de Pantalla Completa</span>
+    </button>
+
     <!-- Navigation Header -->
     <nav class="glass-card sticky top-0 z-50 border-b border-white/5 bg-[#090714]/80 backdrop-blur-md">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -66,6 +75,14 @@
 
                 <!-- User Info & Action -->
                 <div class="flex items-center space-x-3 sm:space-x-4">
+                    <button onclick="toggleFullscreen()" id="fullscreen-btn"
+                        class="text-xs font-semibold px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl transition-all flex items-center space-x-1.5">
+                        <svg id="fullscreen-icon" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                        </svg>
+                        <span class="hidden sm:inline">Pantalla Completa</span>
+                    </button>
+
                     <button onclick="toggleModal('import-modal')" 
                         class="text-xs font-semibold px-3 py-2 sm:px-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-purple-600/20">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -152,6 +169,16 @@
                 <!-- Filters Form -->
                 <form id="filter-form" action="{{ route('dashboard') }}" method="GET" class="w-full sm:w-auto">
                     <div class="flex flex-col sm:flex-row gap-3">
+                        <!-- Units/Sales Toggle -->
+                        <div class="relative">
+                            <label for="view-type" class="sr-only">Tipo de Vista</label>
+                            <select id="view-type" name="view_type" onchange="document.getElementById('filter-form').submit();"
+                                class="w-full sm:w-40 bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
+                                <option value="units" {{ !request('view_type') || request('view_type') === 'units' ? 'selected' : '' }} class="bg-[#090714] text-white">Unidades</option>
+                                <option value="sales" {{ request('view_type') === 'sales' ? 'selected' : '' }} class="bg-[#090714] text-white">Ventas ($)</option>
+                            </select>
+                        </div>
+
                         <!-- Month Filter -->
                         <div class="relative">
                             <label for="month-select" class="sr-only">Seleccionar Mes</label>
@@ -202,8 +229,8 @@
                 </form>
             </div>
 
-            <!-- KPI Cards Grid -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+            {{-- KPI Cards Grid - Hidden --}}
+            {{-- <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
                 <!-- Ventas Totales -->
                 <div class="glass-card rounded-2xl p-6 glow-indigo relative overflow-hidden">
                     <div class="absolute -right-4 -bottom-4 w-24 h-24 rounded-full bg-purple-500/5 blur-2xl pointer-events-none"></div>
@@ -244,10 +271,10 @@
                     <h3 class="text-2xl font-extrabold text-white tracking-tight">{{ number_format($kpis['utility_margin'], 2, ',', '.') }}%</h3>
                     <p class="text-xs text-gray-500 mt-2">Margen comercial de utilidad del mes</p>
                 </div>
-            </div>
+            </div> --}}
 
             <!-- Charts Section -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div id="charts-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <!-- Trend line chart -->
                 <div class="glass-card rounded-2xl p-6">
                     <div class="flex justify-between items-center mb-4">
@@ -272,7 +299,7 @@
             </div>
 
             <!-- Additional Charts Row -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div id="additional-charts-container" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <!-- Top Products Bar Chart -->
                 <div class="glass-card rounded-2xl p-6">
                     <div class="flex justify-between items-center mb-4">
@@ -336,9 +363,14 @@
                             
                             <div class="flex items-center justify-between sm:justify-end space-x-6">
                                 <div class="text-left sm:text-right">
-                                    <span class="text-xs text-gray-450 block uppercase tracking-wider font-semibold">Total Ventas</span>
-                                    <span class="text-base font-extrabold text-white block">Bs. {{ number_format($client['total_sales'], 2, ',', '.') }}</span>
-                                    <span class="text-[10px] text-gray-400 block">{{ number_format($client['total_qty'], 0, ',', '.') }} unidades vendidas</span>
+                                    <span class="text-xs text-gray-450 block uppercase tracking-wider font-semibold">{{ $viewType === 'units' ? 'Total Unidades' : 'Total Ventas' }}</span>
+                                    @if ($viewType === 'units')
+                                        <span class="text-base font-extrabold text-white block">{{ number_format($client['total_qty'], 0, ',', '.') }} unidades</span>
+                                        <span class="text-[10px] text-gray-400 block">Bs. {{ number_format($client['total_sales'], 2, ',', '.') }} en ventas</span>
+                                    @else
+                                        <span class="text-base font-extrabold text-white block">Bs. {{ number_format($client['total_sales'], 2, ',', '.') }}</span>
+                                        <span class="text-[10px] text-gray-400 block">{{ number_format($client['total_qty'], 0, ',', '.') }} unidades vendidas</span>
+                                    @endif
                                 </div>
                                 <div id="icon-{{ $client['code'] }}" class="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-gray-400 transition-transform duration-350 shrink-0">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -509,15 +541,132 @@
             }
         }
 
+        // Fullscreen Toggle
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().then(() => {
+                    updateFullscreenIcon(true);
+                    showChartsOnly(true);
+                }).catch(err => {
+                    console.error('Error al entrar en pantalla completa:', err);
+                });
+            } else {
+                document.exitFullscreen().then(() => {
+                    updateFullscreenIcon(false);
+                    showChartsOnly(false);
+                }).catch(err => {
+                    console.error('Error al salir de pantalla completa:', err);
+                });
+            }
+        }
+
+        // Show only charts in fullscreen mode
+        function showChartsOnly(showOnlyCharts) {
+            const nav = document.querySelector('nav');
+            const filterBar = document.querySelector('.flex.flex-col.sm\\:flex-row.sm\\:items-center.sm\\:justify-between.gap-4.mb-8');
+            const searchSection = document.querySelector('.mb-6.flex.flex-col.sm\\:flex-row');
+            const clientsContainer = document.getElementById('clients-container');
+            const footer = document.querySelector('footer');
+            const chartsContainer = document.getElementById('charts-container');
+            const additionalChartsContainer = document.getElementById('additional-charts-container');
+            const main = document.querySelector('main');
+            const exitBtn = document.getElementById('exit-fullscreen-btn');
+
+            if (showOnlyCharts) {
+                // Hide all non-chart elements
+                if (nav) nav.style.display = 'none';
+                if (filterBar) filterBar.style.display = 'none';
+                if (searchSection) searchSection.style.display = 'none';
+                if (clientsContainer) clientsContainer.style.display = 'none';
+                if (footer) footer.style.display = 'none';
+                
+                // Show floating exit button
+                if (exitBtn) exitBtn.classList.remove('hidden');
+                
+                // Show only charts and adjust layout
+                if (chartsContainer) {
+                    chartsContainer.style.display = 'grid';
+                    chartsContainer.style.gridTemplateColumns = 'repeat(2, 1fr)';
+                    chartsContainer.style.gap = '2rem';
+                    chartsContainer.style.padding = '2rem';
+                    chartsContainer.style.height = '50vh';
+                }
+                if (additionalChartsContainer) {
+                    additionalChartsContainer.style.display = 'grid';
+                    additionalChartsContainer.style.gridTemplateColumns = 'repeat(2, 1fr)';
+                    additionalChartsContainer.style.gap = '2rem';
+                    additionalChartsContainer.style.padding = '0 2rem 2rem 2rem';
+                    additionalChartsContainer.style.height = '50vh';
+                }
+                if (main) {
+                    main.style.padding = '0';
+                    main.style.maxWidth = '100%';
+                }
+            } else {
+                // Restore all elements
+                if (nav) nav.style.display = '';
+                if (filterBar) filterBar.style.display = '';
+                if (searchSection) searchSection.style.display = '';
+                if (clientsContainer) clientsContainer.style.display = '';
+                if (footer) footer.style.display = '';
+                
+                // Hide floating exit button
+                if (exitBtn) exitBtn.classList.add('hidden');
+                
+                // Restore charts layout
+                if (chartsContainer) {
+                    chartsContainer.style.display = '';
+                    chartsContainer.style.gridTemplateColumns = '';
+                    chartsContainer.style.gap = '';
+                    chartsContainer.style.padding = '';
+                    chartsContainer.style.height = '';
+                }
+                if (additionalChartsContainer) {
+                    additionalChartsContainer.style.display = '';
+                    additionalChartsContainer.style.gridTemplateColumns = '';
+                    additionalChartsContainer.style.gap = '';
+                    additionalChartsContainer.style.padding = '';
+                    additionalChartsContainer.style.height = '';
+                }
+                if (main) {
+                    main.style.padding = '';
+                    main.style.maxWidth = '';
+                }
+            }
+        }
+
+        // Update fullscreen icon based on state
+        function updateFullscreenIcon(isFullscreen) {
+            const icon = document.getElementById('fullscreen-icon');
+            const btnText = document.querySelector('#fullscreen-btn span');
+            if (isFullscreen) {
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />';
+                if (btnText) btnText.textContent = 'Salir de Pantalla Completa';
+            } else {
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />';
+                if (btnText) btnText.textContent = 'Pantalla Completa';
+            }
+        }
+
+        // Listen for fullscreen change events (e.g., when user presses ESC)
+        document.addEventListener('fullscreenchange', () => {
+            const isFullscreen = !!document.fullscreenElement;
+            updateFullscreenIcon(isFullscreen);
+            showChartsOnly(isFullscreen);
+        });
+
         @if ($hasData)
         // ----------------- CHARTS INITIALIZATION -----------------
         Chart.defaults.color = '#9ca3af';
         Chart.defaults.font.family = '"Plus Jakarta Sans", sans-serif';
 
+        // View type from server
+        const viewType = '{{ $viewType }}';
+
         // 1. Sales Trend Line Chart (Dynamic from DB)
         const trendData = {!! json_encode($monthlyTrend) !!};
         const trendLabels = trendData.map(item => item.label);
-        const trendTotals = trendData.map(item => item.total);
+        const trendTotals = trendData.map(item => viewType === 'units' ? item.total_qty : item.total_sales);
 
         const salesTrendCtx = document.getElementById('salesTrendChart').getContext('2d');
         const salesGradient = salesTrendCtx.createLinearGradient(0, 0, 0, 300);
@@ -529,7 +678,7 @@
             data: {
                 labels: trendLabels,
                 datasets: [{
-                    label: 'Facturación (Bs)',
+                    label: viewType === 'units' ? 'Unidades' : 'Facturación (Bs)',
                     data: trendTotals,
                     borderColor: '#a855f7',
                     borderWidth: 3,
@@ -545,14 +694,29 @@
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { display: false }
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                if (viewType === 'units') {
+                                    return context.raw.toLocaleString('es-VE', {maximumFractionDigits: 0}) + ' unidades';
+                                } else {
+                                    return 'Bs. ' + context.raw.toLocaleString('es-VE', {minimumFractionDigits: 2});
+                                }
+                            }
+                        }
+                    }
                 },
                 scales: {
                     y: {
                         grid: { color: 'rgba(255, 255, 255, 0.04)' },
                         ticks: {
                             callback: function(value) {
-                                return 'Bs. ' + (value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k');
+                                if (viewType === 'units') {
+                                    return value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k';
+                                } else {
+                                    return 'Bs. ' + (value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k');
+                                }
                             }
                         }
                     },
@@ -564,7 +728,7 @@
         // 2. Class Distribution Doughnut Chart (Dynamic from DB)
         const classData = {!! json_encode($salesByClass) !!};
         const classLabels = classData.map(item => item.client_class);
-        const classTotals = classData.map(item => parseFloat(item.total_sales));
+        const classTotals = classData.map(item => parseFloat(viewType === 'units' ? item.total_qty : item.total_sales));
 
         const categoryCtx = document.getElementById('categoryChart').getContext('2d');
         new Chart(categoryCtx, {
@@ -610,7 +774,11 @@
                                 let value = context.raw || 0;
                                 let total = context.dataset.data.reduce((a, b) => a + b, 0);
                                 let percentage = ((value / total) * 100).toFixed(1);
-                                return label + ': Bs. ' + value.toLocaleString('es-VE', {minimumFractionDigits: 2}) + ' (' + percentage + '%)';
+                                if (viewType === 'units') {
+                                    return label + ': ' + value.toLocaleString('es-VE', {maximumFractionDigits: 0}) + ' unidades (' + percentage + '%)';
+                                } else {
+                                    return label + ': Bs. ' + value.toLocaleString('es-VE', {minimumFractionDigits: 2}) + ' (' + percentage + '%)';
+                                }
                             }
                         }
                     }
@@ -621,7 +789,7 @@
         // 3. Top Products Bar Chart
         const productData = {!! json_encode($salesByProduct) !!};
         const productLabels = productData.map(item => item.product_description.substring(0, 30) + (item.product_description.length > 30 ? '...' : ''));
-        const productTotals = productData.map(item => parseFloat(item.total_sales));
+        const productTotals = productData.map(item => parseFloat(viewType === 'units' ? item.total_qty : item.total_sales));
 
         const productsCtx = document.getElementById('productsBarChart').getContext('2d');
         const productGradient = productsCtx.createLinearGradient(0, 0, 0, 400);
@@ -633,7 +801,7 @@
             data: {
                 labels: productLabels,
                 datasets: [{
-                    label: 'Ventas (Bs)',
+                    label: viewType === 'units' ? 'Unidades' : 'Ventas (Bs)',
                     data: productTotals,
                     backgroundColor: productGradient,
                     borderColor: '#10b981',
@@ -651,7 +819,11 @@
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return 'Bs. ' + context.raw.toLocaleString('es-VE', {minimumFractionDigits: 2});
+                                if (viewType === 'units') {
+                                    return context.raw.toLocaleString('es-VE', {maximumFractionDigits: 0}) + ' unidades';
+                                } else {
+                                    return 'Bs. ' + context.raw.toLocaleString('es-VE', {minimumFractionDigits: 2});
+                                }
                             }
                         }
                     }
@@ -661,7 +833,11 @@
                         grid: { color: 'rgba(255, 255, 255, 0.04)' },
                         ticks: {
                             callback: function(value) {
-                                return 'Bs. ' + (value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k');
+                                if (viewType === 'units') {
+                                    return value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k';
+                                } else {
+                                    return 'Bs. ' + (value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k');
+                                }
                             }
                         }
                     },
@@ -679,7 +855,7 @@
         // 4. Top Clients Bar Chart
         const clientData = {!! json_encode($salesByClient->take(15)) !!};
         const clientLabels = clientData.map(item => item.name.substring(0, 25) + (item.name.length > 25 ? '...' : ''));
-        const clientTotals = clientData.map(item => parseFloat(item.total_sales));
+        const clientTotals = clientData.map(item => parseFloat(viewType === 'units' ? item.total_qty : item.total_sales));
 
         const clientsCtx = document.getElementById('clientsBarChart').getContext('2d');
         const clientGradient = clientsCtx.createLinearGradient(0, 0, 0, 400);
@@ -691,7 +867,7 @@
             data: {
                 labels: clientLabels,
                 datasets: [{
-                    label: 'Ventas (Bs)',
+                    label: viewType === 'units' ? 'Unidades' : 'Ventas (Bs)',
                     data: clientTotals,
                     backgroundColor: clientGradient,
                     borderColor: '#ec4899',
@@ -709,7 +885,11 @@
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return 'Bs. ' + context.raw.toLocaleString('es-VE', {minimumFractionDigits: 2});
+                                if (viewType === 'units') {
+                                    return context.raw.toLocaleString('es-VE', {maximumFractionDigits: 0}) + ' unidades';
+                                } else {
+                                    return 'Bs. ' + context.raw.toLocaleString('es-VE', {minimumFractionDigits: 2});
+                                }
                             }
                         }
                     }
@@ -719,7 +899,11 @@
                         grid: { color: 'rgba(255, 255, 255, 0.04)' },
                         ticks: {
                             callback: function(value) {
-                                return 'Bs. ' + (value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k');
+                                if (viewType === 'units') {
+                                    return value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k';
+                                } else {
+                                    return 'Bs. ' + (value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k');
+                                }
                             }
                         }
                     },

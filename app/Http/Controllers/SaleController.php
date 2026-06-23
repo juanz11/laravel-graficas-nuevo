@@ -44,6 +44,7 @@ class SaleController extends Controller
         // 3. Obtener filtros
         $selectedClient = $request->input('client');
         $selectedProduct = $request->input('product');
+        $viewType = $request->input('view_type', 'units'); // 'units' or 'sales'
 
         // 4. Consultar los datos filtrados por mes y filtros adicionales
         $query = Sale::where('report_date', $selectedMonthVal);
@@ -74,7 +75,7 @@ class SaleController extends Controller
         $salesByClass = Sale::where('report_date', $selectedMonthVal)
             ->select('client_class', DB::raw('SUM(total_sales) as total_sales'), DB::raw('SUM(quantity) as total_qty'))
             ->groupBy('client_class')
-            ->orderBy('total_sales', 'desc')
+            ->orderBy($viewType === 'units' ? 'total_qty' : 'total_sales', 'desc')
             ->get();
 
         // 7. Agrupar ventas por Cliente (respetando filtro de producto si existe)
@@ -94,20 +95,21 @@ class SaleController extends Controller
                 'total_qty' => $clientSales->sum('quantity'),
                 'items' => $clientSales
             ];
-        })->sortByDesc('total_sales');
+        })->sortByDesc($viewType === 'units' ? 'total_qty' : 'total_sales')->values();
 
         // 8. Agrupar ventas por Producto (para gráfica de productos top)
         $salesByProduct = Sale::where('report_date', $selectedMonthVal)
             ->select('product_code', 'product_description', DB::raw('SUM(total_sales) as total_sales'), DB::raw('SUM(quantity) as total_qty'))
             ->groupBy('product_code', 'product_description')
-            ->orderBy('total_sales', 'desc')
+            ->orderBy($viewType === 'units' ? 'total_qty' : 'total_sales', 'desc')
             ->limit(15)
             ->get();
 
         // 9. Calcular tendencia mensual de ventas para el gráfico de línea
         $monthlyTrend = Sale::select(
             DB::raw("DATE_FORMAT(report_date, '%Y-%m-01') as month_date"),
-            DB::raw("SUM(total_sales) as total_sales")
+            DB::raw("SUM(total_sales) as total_sales"),
+            DB::raw("SUM(quantity) as total_qty")
         )
         ->groupBy('month_date')
         ->orderBy('month_date', 'asc')
@@ -116,7 +118,8 @@ class SaleController extends Controller
             $carbon = Carbon::parse($item->month_date);
             return [
                 'label' => $this->getSpanishMonthName($carbon->month) . ' ' . $carbon->year,
-                'total' => (float) $item->total_sales
+                'total_sales' => (float) $item->total_sales,
+                'total_qty' => (float) $item->total_qty
             ];
         });
 
@@ -139,6 +142,7 @@ class SaleController extends Controller
             'selectedMonthLabel' => $selectedMonthLabel,
             'selectedClient' => $selectedClient,
             'selectedProduct' => $selectedProduct,
+            'viewType' => $viewType,
             'kpis' => $kpis,
             'salesByClass' => $salesByClass,
             'salesByClient' => $salesByClient,
