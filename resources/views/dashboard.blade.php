@@ -192,6 +192,20 @@
                                 @endforeach
                             </select>
                         </div>
+
+                        <!-- Class Filter -->
+                        <div class="relative">
+                            <label for="class-select" class="sr-only">Seleccionar Clase</label>
+                            <select id="class-select" name="class" onchange="document.getElementById('filter-form').submit();"
+                                class="w-full sm:w-48 bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
+                                <option value="">Todas las clases</option>
+                                @foreach ($classesList as $class)
+                                    <option value="{{ $class }}" {{ $class === $selectedClass ? 'selected' : '' }} class="bg-[#090714] text-white">
+                                        {{ $class }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
                         
                         <!-- Client Filter -->
                         <div class="relative">
@@ -220,7 +234,7 @@
                         </button>
                         
                         <!-- Clear Filters Button -->
-                        @if ($selectedClient || $selectedProduct)
+                        @if ($selectedClient || $selectedClass || $selectedProduct)
                         <a href="{{ route('dashboard', ['month' => $selectedMonthVal]) }}" class="px-6 py-3 bg-white/5 hover:bg-white/10 text-white text-sm font-semibold rounded-xl transition-all text-center">
                             Limpiar
                         </a>

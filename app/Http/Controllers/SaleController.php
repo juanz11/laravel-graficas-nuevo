@@ -43,6 +43,7 @@ class SaleController extends Controller
 
         // 3. Obtener filtros
         $selectedClient = $request->input('client');
+        $selectedClass = $request->input('class');
         $selectedProduct = $request->input('product');
         $viewType = $request->input('view_type', 'units'); // 'units' or 'sales'
 
@@ -52,10 +53,16 @@ class SaleController extends Controller
         if ($selectedClient) {
             $query->where('client_code', $selectedClient);
         }
+
+        if ($selectedClass) {
+            $query->where('client_class', $selectedClass);
+        }
         
         if ($selectedProduct) {
-            $query->where('product_code', 'like', '%' . $selectedProduct . '%')
+            $query->where(function ($q) use ($selectedProduct) {
+                $q->where('product_code', 'like', '%' . $selectedProduct . '%')
                   ->orWhere('product_description', 'like', '%' . $selectedProduct . '%');
+            });
         }
         
         $sales = $query->get();
@@ -78,11 +85,16 @@ class SaleController extends Controller
             ->orderBy($viewType === 'units' ? 'total_qty' : 'total_sales', 'desc')
             ->get();
 
-        // 7. Agrupar ventas por Cliente (respetando filtro de producto si existe)
+        // 7. Agrupar ventas por Cliente (respetando filtros de producto y clase si existen)
         $clientQuery = Sale::where('report_date', $selectedMonthVal);
+        if ($selectedClass) {
+            $clientQuery->where('client_class', $selectedClass);
+        }
         if ($selectedProduct) {
-            $clientQuery->where('product_code', 'like', '%' . $selectedProduct . '%')
-                       ->orWhere('product_description', 'like', '%' . $selectedProduct . '%');
+            $clientQuery->where(function ($q) use ($selectedProduct) {
+                $q->where('product_code', 'like', '%' . $selectedProduct . '%')
+                  ->orWhere('product_description', 'like', '%' . $selectedProduct . '%');
+            });
         }
         
         $salesByClient = $clientQuery->get()->groupBy('client_code')->map(function ($clientSales) {
@@ -97,35 +109,57 @@ class SaleController extends Controller
             ];
         })->sortByDesc($viewType === 'units' ? 'total_qty' : 'total_sales')->values();
 
-        // 8. Agrupar ventas por Producto (para gráfica de productos top)
-        $salesByProduct = Sale::where('report_date', $selectedMonthVal)
+        // 8. Agrupar ventas por Producto (para gráfica de productos top, respetando filtros de cliente y clase si existen)
+        $productQuery = Sale::where('report_date', $selectedMonthVal);
+        if ($selectedClient) {
+            $productQuery->where('client_code', $selectedClient);
+        }
+        if ($selectedClass) {
+            $productQuery->where('client_class', $selectedClass);
+        }
+        $salesByProduct = $productQuery
             ->select('product_code', 'product_description', DB::raw('SUM(total_sales) as total_sales'), DB::raw('SUM(quantity) as total_qty'))
             ->groupBy('product_code', 'product_description')
             ->orderBy($viewType === 'units' ? 'total_qty' : 'total_sales', 'desc')
             ->limit(15)
             ->get();
 
-        // 9. Calcular tendencia mensual de ventas para el gráfico de línea
-        $monthlyTrend = Sale::select(
+        // 9. Calcular tendencia mensual de ventas para el gráfico de línea (respetando filtros de cliente, clase y producto si existen)
+        $trendQuery = Sale::select(
             DB::raw("DATE_FORMAT(report_date, '%Y-%m-01') as month_date"),
             DB::raw("SUM(total_sales) as total_sales"),
             DB::raw("SUM(quantity) as total_qty")
-        )
-        ->groupBy('month_date')
-        ->orderBy('month_date', 'asc')
-        ->get()
-        ->map(function ($item) {
-            $carbon = Carbon::parse($item->month_date);
-            return [
-                'label' => $this->getSpanishMonthName($carbon->month) . ' ' . $carbon->year,
-                'total_sales' => (float) $item->total_sales,
-                'total_qty' => (float) $item->total_qty
-            ];
-        });
+        );
+        if ($selectedClient) {
+            $trendQuery->where('client_code', $selectedClient);
+        }
+        if ($selectedClass) {
+            $trendQuery->where('client_class', $selectedClass);
+        }
+        if ($selectedProduct) {
+            $trendQuery->where(function ($q) use ($selectedProduct) {
+                $q->where('product_code', 'like', '%' . $selectedProduct . '%')
+                  ->orWhere('product_description', 'like', '%' . $selectedProduct . '%');
+            });
+        }
+        $monthlyTrend = $trendQuery->groupBy('month_date')
+            ->orderBy('month_date', 'asc')
+            ->get()
+            ->map(function ($item) {
+                $carbon = Carbon::parse($item->month_date);
+                return [
+                    'label' => $this->getSpanishMonthName($carbon->month) . ' ' . $carbon->year,
+                    'total_sales' => (float) $item->total_sales,
+                    'total_qty' => (float) $item->total_qty
+                ];
+            });
 
-        // 10. Obtener lista de clientes para el filtro
-        $clientsList = Sale::where('report_date', $selectedMonthVal)
-            ->select('client_code', 'client_name')
+        // 10. Obtener lista de clientes para el filtro (respetando la clase seleccionada si existe)
+        $clientsQuery = Sale::where('report_date', $selectedMonthVal);
+        if ($selectedClass) {
+            $clientsQuery->where('client_class', $selectedClass);
+        }
+        $clientsList = $clientsQuery->select('client_code', 'client_name')
             ->distinct()
             ->orderBy('client_name')
             ->get()
@@ -136,11 +170,21 @@ class SaleController extends Controller
                 ];
             });
 
+        // 11. Obtener lista de clases únicas para el selector de filtros
+        $classesList = Sale::where('report_date', $selectedMonthVal)
+            ->whereNotNull('client_class')
+            ->where('client_class', '!=', '')
+            ->select('client_class')
+            ->distinct()
+            ->orderBy('client_class')
+            ->pluck('client_class');
+
         return view('dashboard', [
             'months' => $months,
             'selectedMonthVal' => $selectedMonthVal,
             'selectedMonthLabel' => $selectedMonthLabel,
             'selectedClient' => $selectedClient,
+            'selectedClass' => $selectedClass,
             'selectedProduct' => $selectedProduct,
             'viewType' => $viewType,
             'kpis' => $kpis,
@@ -149,6 +193,7 @@ class SaleController extends Controller
             'salesByProduct' => $salesByProduct,
             'monthlyTrend' => $monthlyTrend,
             'clientsList' => $clientsList,
+            'classesList' => $classesList,
             'hasData' => $sales->isNotEmpty(),
         ]);
     }
