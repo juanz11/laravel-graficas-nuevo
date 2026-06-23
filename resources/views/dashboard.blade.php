@@ -149,18 +149,55 @@
                     <p class="text-gray-400 text-sm mt-1">Análisis del mes: <span class="text-purple-400 font-semibold">{{ $selectedMonthLabel }}</span></p>
                 </div>
                 
-                <!-- Month Filter Form -->
+                <!-- Filters Form -->
                 <form id="filter-form" action="{{ route('dashboard') }}" method="GET" class="w-full sm:w-auto">
-                    <div class="relative">
-                        <label for="month-select" class="sr-only">Seleccionar Mes</label>
-                        <select id="month-select" name="month" onchange="document.getElementById('filter-form').submit();"
-                            class="w-full sm:w-60 bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
-                            @foreach ($months as $m)
-                                <option value="{{ $m['val'] }}" {{ $m['val'] === $selectedMonthVal ? 'selected' : '' }} class="bg-[#090714] text-white">
-                                    {{ $m['label'] }}
-                                </option>
-                            @endforeach
-                        </select>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <!-- Month Filter -->
+                        <div class="relative">
+                            <label for="month-select" class="sr-only">Seleccionar Mes</label>
+                            <select id="month-select" name="month" onchange="document.getElementById('filter-form').submit();"
+                                class="w-full sm:w-48 bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
+                                <option value="">Todos los meses</option>
+                                @foreach ($months as $m)
+                                    <option value="{{ $m['val'] }}" {{ $m['val'] === $selectedMonthVal ? 'selected' : '' }} class="bg-[#090714] text-white">
+                                        {{ $m['label'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        
+                        <!-- Client Filter -->
+                        <div class="relative">
+                            <label for="client-select" class="sr-only">Seleccionar Cliente</label>
+                            <select id="client-select" name="client" onchange="document.getElementById('filter-form').submit();"
+                                class="w-full sm:w-56 bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
+                                <option value="">Todos los clientes</option>
+                                @foreach ($clientsList as $client)
+                                    <option value="{{ $client['code'] }}" {{ $client['code'] === $selectedClient ? 'selected' : '' }} class="bg-[#090714] text-white">
+                                        {{ $client['name'] }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        
+                        <!-- Product Filter -->
+                        <div class="relative">
+                            <label for="product-input" class="sr-only">Buscar Producto</label>
+                            <input type="text" id="product-input" name="product" value="{{ $selectedProduct ?? '' }}" placeholder="Buscar producto..."
+                                class="w-full sm:w-56 bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all">
+                        </div>
+                        
+                        <!-- Apply Filter Button -->
+                        <button type="submit" class="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold rounded-xl transition-all">
+                            Filtrar
+                        </button>
+                        
+                        <!-- Clear Filters Button -->
+                        @if ($selectedClient || $selectedProduct)
+                        <a href="{{ route('dashboard', ['month' => $selectedMonthVal]) }}" class="px-6 py-3 bg-white/5 hover:bg-white/10 text-white text-sm font-semibold rounded-xl transition-all text-center">
+                            Limpiar
+                        </a>
+                        @endif
                     </div>
                 </form>
             </div>
@@ -209,27 +246,52 @@
                 </div>
             </div>
 
-            <!-- Charts Section (if multiple months are available) -->
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                <!-- Trend line chart (2 cols) -->
-                <div class="glass-card rounded-2xl p-6 lg:col-span-2">
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Trend line chart -->
+                <div class="glass-card rounded-2xl p-6">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-base font-bold text-white">Evolución de Ventas Mensual</h3>
+                        <h3 class="text-lg font-bold text-white">Evolución de Ventas Mensual</h3>
                         <span class="text-xs text-gray-400">Histórico de importaciones</span>
                     </div>
-                    <div class="h-80 w-full relative">
+                    <div class="h-96 w-full relative">
                         <canvas id="salesTrendChart"></canvas>
                     </div>
                 </div>
 
-                <!-- Category distribution chart (1 col) -->
+                <!-- Category distribution doughnut chart -->
                 <div class="glass-card rounded-2xl p-6">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-base font-bold text-white">Ventas por Clase de Cliente</h3>
+                        <h3 class="text-lg font-bold text-white">Ventas por Clase de Cliente</h3>
                         <span class="text-xs text-gray-400">Participación</span>
                     </div>
-                    <div class="h-80 w-full relative flex items-center justify-center">
+                    <div class="h-96 w-full relative flex items-center justify-center">
                         <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Charts Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Top Products Bar Chart -->
+                <div class="glass-card rounded-2xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold text-white">Top 15 Productos por Ventas</h3>
+                        <span class="text-xs text-gray-400">Mejores vendidos del mes</span>
+                    </div>
+                    <div class="h-96 w-full relative">
+                        <canvas id="productsBarChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Top Clients Bar Chart -->
+                <div class="glass-card rounded-2xl p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold text-white">Top 15 Clientes por Ventas</h3>
+                        <span class="text-xs text-gray-400">Mayores compradores del mes</span>
+                    </div>
+                    <div class="h-96 w-full relative">
+                        <canvas id="clientsBarChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -518,10 +580,13 @@
                         '#f59e0b',
                         '#10b981',
                         '#06b6d4',
-                        '#ef4444'
+                        '#ef4444',
+                        '#8b5cf6',
+                        '#f97316',
+                        '#14b8a6'
                     ],
                     borderWidth: 0,
-                    hoverOffset: 4
+                    hoverOffset: 8
                 }]
             },
             options: {
@@ -531,9 +596,11 @@
                     legend: {
                         position: 'bottom',
                         labels: {
-                            padding: 15,
-                            font: { size: 11 },
-                            color: '#9ca3af'
+                            padding: 20,
+                            font: { size: 12 },
+                            color: '#9ca3af',
+                            usePointStyle: true,
+                            pointStyle: 'circle'
                         }
                     },
                     tooltip: {
@@ -541,8 +608,126 @@
                             label: function(context) {
                                 let label = context.label || '';
                                 let value = context.raw || 0;
-                                return label + ': Bs. ' + value.toLocaleString('es-VE', {minimumFractionDigits: 2});
+                                let total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                let percentage = ((value / total) * 100).toFixed(1);
+                                return label + ': Bs. ' + value.toLocaleString('es-VE', {minimumFractionDigits: 2}) + ' (' + percentage + '%)';
                             }
+                        }
+                    }
+                }
+            }
+        });
+
+        // 3. Top Products Bar Chart
+        const productData = {!! json_encode($salesByProduct) !!};
+        const productLabels = productData.map(item => item.product_description.substring(0, 30) + (item.product_description.length > 30 ? '...' : ''));
+        const productTotals = productData.map(item => parseFloat(item.total_sales));
+
+        const productsCtx = document.getElementById('productsBarChart').getContext('2d');
+        const productGradient = productsCtx.createLinearGradient(0, 0, 0, 400);
+        productGradient.addColorStop(0, 'rgba(16, 185, 129, 0.8)');
+        productGradient.addColorStop(1, 'rgba(16, 185, 129, 0.2)');
+
+        new Chart(productsCtx, {
+            type: 'bar',
+            data: {
+                labels: productLabels,
+                datasets: [{
+                    label: 'Ventas (Bs)',
+                    data: productTotals,
+                    backgroundColor: productGradient,
+                    borderColor: '#10b981',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Bs. ' + context.raw.toLocaleString('es-VE', {minimumFractionDigits: 2});
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                        ticks: {
+                            callback: function(value) {
+                                return 'Bs. ' + (value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k');
+                            }
+                        }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: {
+                            font: { size: 11 },
+                            color: '#9ca3af'
+                        }
+                    }
+                }
+            }
+        });
+
+        // 4. Top Clients Bar Chart
+        const clientData = {!! json_encode($salesByClient->take(15)) !!};
+        const clientLabels = clientData.map(item => item.name.substring(0, 25) + (item.name.length > 25 ? '...' : ''));
+        const clientTotals = clientData.map(item => parseFloat(item.total_sales));
+
+        const clientsCtx = document.getElementById('clientsBarChart').getContext('2d');
+        const clientGradient = clientsCtx.createLinearGradient(0, 0, 0, 400);
+        clientGradient.addColorStop(0, 'rgba(236, 72, 153, 0.8)');
+        clientGradient.addColorStop(1, 'rgba(236, 72, 153, 0.2)');
+
+        new Chart(clientsCtx, {
+            type: 'bar',
+            data: {
+                labels: clientLabels,
+                datasets: [{
+                    label: 'Ventas (Bs)',
+                    data: clientTotals,
+                    backgroundColor: clientGradient,
+                    borderColor: '#ec4899',
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return 'Bs. ' + context.raw.toLocaleString('es-VE', {minimumFractionDigits: 2});
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                        ticks: {
+                            callback: function(value) {
+                                return 'Bs. ' + (value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k');
+                            }
+                        }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: {
+                            font: { size: 11 },
+                            color: '#9ca3af'
                         }
                     }
                 }

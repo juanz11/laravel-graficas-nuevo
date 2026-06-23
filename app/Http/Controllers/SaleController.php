@@ -41,10 +41,25 @@ class SaleController extends Controller
         $selectedMonth = Carbon::parse($selectedMonthVal);
         $selectedMonthLabel = $this->getSpanishMonthName($selectedMonth->month) . ' ' . $selectedMonth->year;
 
-        // 3. Consultar los datos filtrados por mes
-        $sales = Sale::where('report_date', $selectedMonthVal)->get();
+        // 3. Obtener filtros
+        $selectedClient = $request->input('client');
+        $selectedProduct = $request->input('product');
 
-        // 4. Calcular KPIs principales
+        // 4. Consultar los datos filtrados por mes y filtros adicionales
+        $query = Sale::where('report_date', $selectedMonthVal);
+        
+        if ($selectedClient) {
+            $query->where('client_code', $selectedClient);
+        }
+        
+        if ($selectedProduct) {
+            $query->where('product_code', 'like', '%' . $selectedProduct . '%')
+                  ->orWhere('product_description', 'like', '%' . $selectedProduct . '%');
+        }
+        
+        $sales = $query->get();
+
+        // 5. Calcular KPIs principales
         $kpis = [
             'total_sales' => $sales->sum('total_sales'),
             'total_cost' => $sales->sum('total_cost'),
@@ -55,15 +70,21 @@ class SaleController extends Controller
                 : 0,
         ];
 
-        // 5. Agrupar ventas por Clase de cliente
+        // 6. Agrupar ventas por Clase de cliente (sin filtros de cliente/producto para mostrar distribución general)
         $salesByClass = Sale::where('report_date', $selectedMonthVal)
             ->select('client_class', DB::raw('SUM(total_sales) as total_sales'), DB::raw('SUM(quantity) as total_qty'))
             ->groupBy('client_class')
             ->orderBy('total_sales', 'desc')
             ->get();
 
-        // 6. Agrupar ventas por Cliente
-        $salesByClient = $sales->groupBy('client_code')->map(function ($clientSales) {
+        // 7. Agrupar ventas por Cliente (respetando filtro de producto si existe)
+        $clientQuery = Sale::where('report_date', $selectedMonthVal);
+        if ($selectedProduct) {
+            $clientQuery->where('product_code', 'like', '%' . $selectedProduct . '%')
+                       ->orWhere('product_description', 'like', '%' . $selectedProduct . '%');
+        }
+        
+        $salesByClient = $clientQuery->get()->groupBy('client_code')->map(function ($clientSales) {
             $first = $clientSales->first();
             return [
                 'code' => $first->client_code,
@@ -75,7 +96,15 @@ class SaleController extends Controller
             ];
         })->sortByDesc('total_sales');
 
-        // 7. Calcular tendencia mensual de ventas para el gráfico de línea
+        // 8. Agrupar ventas por Producto (para gráfica de productos top)
+        $salesByProduct = Sale::where('report_date', $selectedMonthVal)
+            ->select('product_code', 'product_description', DB::raw('SUM(total_sales) as total_sales'), DB::raw('SUM(quantity) as total_qty'))
+            ->groupBy('product_code', 'product_description')
+            ->orderBy('total_sales', 'desc')
+            ->limit(15)
+            ->get();
+
+        // 9. Calcular tendencia mensual de ventas para el gráfico de línea
         $monthlyTrend = Sale::select(
             DB::raw("DATE_FORMAT(report_date, '%Y-%m-01') as month_date"),
             DB::raw("SUM(total_sales) as total_sales")
@@ -91,14 +120,31 @@ class SaleController extends Controller
             ];
         });
 
+        // 10. Obtener lista de clientes para el filtro
+        $clientsList = Sale::where('report_date', $selectedMonthVal)
+            ->select('client_code', 'client_name')
+            ->distinct()
+            ->orderBy('client_name')
+            ->get()
+            ->map(function ($client) {
+                return [
+                    'code' => $client->client_code,
+                    'name' => $client->client_name
+                ];
+            });
+
         return view('dashboard', [
             'months' => $months,
             'selectedMonthVal' => $selectedMonthVal,
             'selectedMonthLabel' => $selectedMonthLabel,
+            'selectedClient' => $selectedClient,
+            'selectedProduct' => $selectedProduct,
             'kpis' => $kpis,
             'salesByClass' => $salesByClass,
             'salesByClient' => $salesByClient,
+            'salesByProduct' => $salesByProduct,
             'monthlyTrend' => $monthlyTrend,
+            'clientsList' => $clientsList,
             'hasData' => $sales->isNotEmpty(),
         ]);
     }
@@ -208,11 +254,11 @@ class SaleController extends Controller
                             $colMap['desc'] = $colLetter;
                         } elseif (str_contains($val, 'cantidad')) {
                             $colMap['qty'] = $colLetter;
-                        } elseif (str_contains($val, 'total ventas') || ($str_contains($val, 'total') && str_contains($val, 'venta'))) {
+                        } elseif (str_contains($val, 'total ventas') || (str_contains($val, 'total') && str_contains($val, 'venta'))) {
                             $colMap['sales'] = $colLetter;
-                        } elseif (str_contains($val, 'total costo') || ($str_contains($val, 'total') && str_contains($val, 'costo'))) {
+                        } elseif (str_contains($val, 'total costo') || (str_contains($val, 'total') && str_contains($val, 'costo'))) {
                             $colMap['cost'] = $colLetter;
-                        } elseif (str_contains($val, 'total utilidad') || ($str_contains($val, 'total') && str_contains($val, 'utilidad'))) {
+                        } elseif (str_contains($val, 'total utilidad') || (str_contains($val, 'total') && str_contains($val, 'utilidad'))) {
                             $colMap['utility'] = $colLetter;
                         } elseif (str_contains($val, '% utilidad')) {
                             $colMap['utility_percent'] = $colLetter;
@@ -313,10 +359,11 @@ class SaleController extends Controller
      */
     private function cleanAmount($val)
     {
+        // Si ya es numérico (PhpSpreadsheet ya lo convirtió), retornarlo directamente
         if (is_numeric($val)) {
             return (float) $val;
         }
-        if (empty($val)) {
+        if (empty($val) || $val === '' || $val === null) {
             return 0.0;
         }
         $val = trim((string)$val);
@@ -328,12 +375,25 @@ class SaleController extends Controller
         }
         
         // Remover símbolos porcentuales y espacios
-        $val = str_replace(['%', ' '], '', $val);
+        $val = str_replace(['%', ' ', 'Bs', 'Bs.'], '', $val);
+        
+        // Si está vacío después de limpiar
+        if (empty($val)) {
+            return 0.0;
+        }
         
         // Si tiene coma, es formato en español (ej: 181.748,69 o --1.526.465,08)
         if (str_contains($val, ',')) {
-            $val = str_replace('.', '', $val); // Quitar puntos de miles
-            $val = str_replace(',', '.', $val); // Reemplazar coma decimal por punto
+            // Verificar si la coma es decimal o separador de miles
+            $parts = explode(',', $val);
+            if (count($parts) === 2 && strlen($parts[1]) <= 2) {
+                // La coma es decimal (ej: 181,75)
+                $val = str_replace('.', '', $val); // Quitar puntos de miles si existen
+                $val = str_replace(',', '.', $val); // Reemplazar coma decimal por punto
+            } else {
+                // La coma es separador de miles (ej: 1,234,567.89)
+                $val = str_replace(',', '', $val); // Quitar comas de miles
+            }
         } else {
             // Si tiene más de un punto, son separadores de miles
             if (substr_count($val, '.') > 1) {
