@@ -539,11 +539,16 @@
 
         // Client Search Filter
         function filterClients() {
-            const searchVal = document.getElementById('search-input').value.toLowerCase();
+            const searchInput = document.getElementById('search-input');
+            if (!searchInput) return;
+            
+            // Normalizar para eliminar acentos/diacríticos y buscar de forma insensible
+            const searchVal = searchInput.value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
             const cards = document.getElementsByClassName('client-card');
             
             for (let i = 0; i < cards.length; i++) {
-                const name = cards[i].getAttribute('data-name');
+                const rawName = cards[i].getAttribute('data-name') || '';
+                const name = rawName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
                 if (name.includes(searchVal)) {
                     cards[i].style.display = "";
                 } else {

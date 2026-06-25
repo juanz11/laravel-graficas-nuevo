@@ -177,4 +177,58 @@ class SaleControllerTest extends TestCase
         $this->assertEquals(2.50, $clientOne['total_sales']);
         $this->assertEquals(2.50, $clientOne['items'][0]->total_sales);
     }
+
+    /** @test */
+    public function test_it_filters_sales_by_client_and_product_in_dashboard()
+    {
+        $user = User::factory()->create();
+
+        // Create sales for Client A and Client B
+        Sale::create([
+            'report_date' => '2026-01-01',
+            'client_code' => 'CLI_A',
+            'client_name' => 'Client A',
+            'client_class' => 'CLASS_X',
+            'product_code' => 'PROD_1',
+            'product_description' => 'Product 1',
+            'quantity' => 10,
+            'total_sales' => 100.00,
+        ]);
+
+        Sale::create([
+            'report_date' => '2026-01-01',
+            'client_code' => 'CLI_B',
+            'client_name' => 'Client B',
+            'client_class' => 'CLASS_X',
+            'product_code' => 'PROD_2',
+            'product_description' => 'Product 2',
+            'quantity' => 20,
+            'total_sales' => 200.00,
+        ]);
+
+
+        // 1. Filter by client CLI_A
+        $response = $this->actingAs($user)->get(route('dashboard', [
+            'month' => '2026-01-01',
+            'client' => 'CLI_A'
+        ]));
+
+        $response->assertStatus(200);
+        $salesByClient = $response->viewData('salesByClient');
+        // Now only CLI_A should be present in salesByClient
+        $this->assertCount(1, $salesByClient);
+        $this->assertEquals('CLI_A', $salesByClient[0]['code']);
+
+        // 2. Filter by product PROD_2
+        $response = $this->actingAs($user)->get(route('dashboard', [
+            'month' => '2026-01-01',
+            'product' => 'PROD_2'
+        ]));
+
+        $response->assertStatus(200);
+        $salesByProduct = $response->viewData('salesByProduct');
+        // Now only PROD_2 should be in salesByProduct
+        $this->assertCount(1, $salesByProduct);
+        $this->assertEquals('PROD_2', $salesByProduct[0]->product_code);
+    }
 }
