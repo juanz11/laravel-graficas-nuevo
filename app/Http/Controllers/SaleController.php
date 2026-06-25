@@ -114,16 +114,31 @@ class SaleController extends Controller
             });
         }
         
-        $salesByClient = $clientQuery->get()->groupBy('client_code')->map(function ($clientSales) {
+        $salesByClient = $clientQuery->get()->groupBy('client_code')->map(function ($clientSales) use ($viewType) {
             $first = $clientSales->first();
+            
+            $groupedItems = $clientSales->groupBy('product_code')->map(function ($productSales) {
+                $firstProd = $productSales->first();
+                return (object)[
+                    'product_code' => $firstProd->product_code,
+                    'product_description' => $firstProd->product_description,
+                    'quantity' => $productSales->sum('quantity'),
+                    'total_sales' => $productSales->sum('total_sales'),
+                ];
+            })->filter(function ($item) {
+                return $item->quantity > 0;
+            })->sortByDesc($viewType === 'units' ? 'quantity' : 'total_sales')->values();
+
             return [
                 'code' => $first->client_code,
                 'name' => $first->client_name,
                 'class' => $first->client_class,
                 'total_sales' => $clientSales->sum('total_sales'),
                 'total_qty' => $clientSales->sum('quantity'),
-                'items' => $clientSales
+                'items' => $groupedItems
             ];
+        })->filter(function ($client) {
+            return $client['total_qty'] > 0;
         })->sortByDesc($viewType === 'units' ? 'total_qty' : 'total_sales')->values();
 
         // 8. Agrupar ventas por Producto (para gráfica de productos top, respetando filtros de cliente y clase si existen)
@@ -140,13 +155,18 @@ class SaleController extends Controller
         $salesByProduct = $productQuery
             ->select('product_code', 'product_description', DB::raw('SUM(total_sales) as total_sales'), DB::raw('SUM(quantity) as total_qty'))
             ->groupBy('product_code', 'product_description')
+            ->havingRaw('SUM(quantity) > 0')
             ->orderBy($viewType === 'units' ? 'total_qty' : 'total_sales', 'desc')
             ->limit(15)
             ->get();
 
         // 9. Calcular tendencia mensual de ventas para el gráfico de línea (respetando filtros de cliente, clase y producto si existen)
+        $monthDateFormat = DB::connection()->getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m-01', report_date)"
+            : "DATE_FORMAT(report_date, '%Y-%m-01')";
+
         $trendQuery = Sale::select(
-            DB::raw("DATE_FORMAT(report_date, '%Y-%m-01') as month_date"),
+            DB::raw("$monthDateFormat as month_date"),
             DB::raw("SUM(total_sales) as total_sales"),
             DB::raw("SUM(quantity) as total_qty")
         );
