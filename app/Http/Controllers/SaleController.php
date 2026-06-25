@@ -78,13 +78,15 @@ class SaleController extends Controller
         $sales = $query->get();
 
         // 5. Calcular KPIs principales
+        $totalSalesUsd = $sales->sum(fn($s) => $s->total_sales / ($s->exchange_rate ?: 1));
+        $totalUtilityUsd = $sales->sum(fn($s) => $s->total_utility / ($s->exchange_rate ?: 1));
         $kpis = [
-            'total_sales' => $sales->sum('total_sales'),
-            'total_cost' => $sales->sum('total_cost'),
-            'total_utility' => $sales->sum('total_utility'),
+            'total_sales' => $totalSalesUsd,
+            'total_cost' => $sales->sum(fn($s) => $s->total_cost / ($s->exchange_rate ?: 1)),
+            'total_utility' => $totalUtilityUsd,
             'total_quantity' => $sales->sum('quantity'),
-            'utility_margin' => $sales->sum('total_sales') > 0 
-                ? ($sales->sum('total_utility') / $sales->sum('total_sales')) * 100 
+            'utility_margin' => $totalSalesUsd > 0 
+                ? ($totalUtilityUsd / $totalSalesUsd) * 100 
                 : 0,
         ];
 
@@ -94,7 +96,7 @@ class SaleController extends Controller
             $classQuery->where('report_date', $selectedMonthVal);
         }
         $salesByClass = $classQuery
-            ->select('client_class', DB::raw('SUM(total_sales) as total_sales'), DB::raw('SUM(quantity) as total_qty'))
+            ->select('client_class', DB::raw('SUM(total_sales / COALESCE(exchange_rate, 1)) as total_sales'), DB::raw('SUM(quantity) as total_qty'))
             ->groupBy('client_class')
             ->orderBy($viewType === 'units' ? 'total_qty' : 'total_sales', 'desc')
             ->get();
@@ -123,7 +125,7 @@ class SaleController extends Controller
                     'product_code' => $firstProd->product_code,
                     'product_description' => $firstProd->product_description,
                     'quantity' => $productSales->sum('quantity'),
-                    'total_sales' => $productSales->sum('total_sales'),
+                    'total_sales' => $productSales->sum(fn($s) => $s->total_sales / ($s->exchange_rate ?: 1)),
                 ];
             })->filter(function ($item) {
                 return $item->quantity > 0;
@@ -133,12 +135,10 @@ class SaleController extends Controller
                 'code' => $first->client_code,
                 'name' => $first->client_name,
                 'class' => $first->client_class,
-                'total_sales' => $clientSales->sum('total_sales'),
+                'total_sales' => $clientSales->sum(fn($s) => $s->total_sales / ($s->exchange_rate ?: 1)),
                 'total_qty' => $clientSales->sum('quantity'),
                 'items' => $groupedItems
             ];
-        })->filter(function ($client) {
-            return $client['total_qty'] > 0;
         })->sortByDesc($viewType === 'units' ? 'total_qty' : 'total_sales')->values();
 
         // 8. Agrupar ventas por Producto (para gráfica de productos top, respetando filtros de cliente y clase si existen)
@@ -153,7 +153,7 @@ class SaleController extends Controller
             $productQuery->where('client_class', $selectedClass);
         }
         $salesByProduct = $productQuery
-            ->select('product_code', 'product_description', DB::raw('SUM(total_sales) as total_sales'), DB::raw('SUM(quantity) as total_qty'))
+            ->select('product_code', 'product_description', DB::raw('SUM(total_sales / COALESCE(exchange_rate, 1)) as total_sales'), DB::raw('SUM(quantity) as total_qty'))
             ->groupBy('product_code', 'product_description')
             ->havingRaw('SUM(quantity) > 0')
             ->orderBy($viewType === 'units' ? 'total_qty' : 'total_sales', 'desc')
@@ -167,7 +167,7 @@ class SaleController extends Controller
 
         $trendQuery = Sale::select(
             DB::raw("$monthDateFormat as month_date"),
-            DB::raw("SUM(total_sales) as total_sales"),
+            DB::raw("SUM(total_sales / COALESCE(exchange_rate, 1)) as total_sales"),
             DB::raw("SUM(quantity) as total_qty")
         );
         if ($selectedClient) {
@@ -251,10 +251,18 @@ class SaleController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'report_file' => 'required|file|mimes:xlsx,xls,csv,txt,html|max:10240',
+            'report_file' => 'required|file|max:10240',
+            'exchange_rate' => 'required|numeric|gt:0',
         ]);
 
+        $exchangeRate = (float) $request->input('exchange_rate');
         $file = $request->file('report_file');
+        
+        $extension = strtolower($file->getClientOriginalExtension());
+        if (!in_array($extension, ['xlsx', 'xls', 'csv', 'txt', 'html'])) {
+            return back()->withErrors(['report_file' => 'El archivo debe tener una extensión válida: xlsx, xls, csv, txt, html.']);
+        }
+
         $filePath = $file->getRealPath();
 
         try {
@@ -408,6 +416,7 @@ class SaleController extends Controller
 
                     $salesToInsert[] = [
                         'report_date' => $reportDate,
+                        'exchange_rate' => $exchangeRate,
                         'client_code' => $currentClientCode,
                         'client_name' => $currentClientName,
                         'client_class' => $currentClientClass,

@@ -249,30 +249,30 @@
                 <div class="glass-card rounded-2xl p-6 glow-indigo relative overflow-hidden">
                     <div class="absolute -right-4 -bottom-4 w-24 h-24 rounded-full bg-purple-500/5 blur-2xl pointer-events-none"></div>
                     <div class="flex items-center justify-between mb-4">
-                        <span class="text-xs font-bold uppercase tracking-wider text-purple-400">Total Ventas (Bs)</span>
+                        <span class="text-xs font-bold uppercase tracking-wider text-purple-400">Total Ventas ($)</span>
                         <span class="p-1 bg-purple-500/10 text-purple-300 rounded text-[10px] font-semibold">Facturación</span>
                     </div>
-                    <h3 class="text-2xl font-extrabold text-white tracking-tight">Bs. {{ number_format($kpis['total_sales'], 2, ',', '.') }}</h3>
+                    <h3 class="text-2xl font-extrabold text-white tracking-tight">$ {{ number_format($kpis['total_sales'], 2, ',', '.') }}</h3>
                     <p class="text-xs text-gray-500 mt-2">Monto neto facturado en el mes</p>
                 </div>
                 
                 <!-- Costo Total -->
                 <div class="glass-card rounded-2xl p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <span class="text-xs font-bold uppercase tracking-wider text-purple-400">Costo Acumulado (Bs)</span>
+                        <span class="text-xs font-bold uppercase tracking-wider text-purple-400">Costo Acumulado ($)</span>
                         <span class="p-1 bg-yellow-500/10 text-yellow-300 rounded text-[10px] font-semibold">Costo</span>
                     </div>
-                    <h3 class="text-2xl font-extrabold text-white tracking-tight">Bs. {{ number_format($kpis['total_cost'], 2, ',', '.') }}</h3>
+                    <h3 class="text-2xl font-extrabold text-white tracking-tight">$ {{ number_format($kpis['total_cost'], 2, ',', '.') }}</h3>
                     <p class="text-xs text-gray-500 mt-2">Costo estimado de medicamentos vendidos</p>
                 </div>
 
                 <!-- Utilidad Total -->
                 <div class="glass-card rounded-2xl p-6">
                     <div class="flex items-center justify-between mb-4">
-                        <span class="text-xs font-bold uppercase tracking-wider text-purple-400">Utilidad Operacional (Bs)</span>
+                        <span class="text-xs font-bold uppercase tracking-wider text-purple-400">Utilidad Operacional ($)</span>
                         <span class="p-1 bg-emerald-500/10 text-emerald-300 rounded text-[10px] font-semibold">Beneficio</span>
                     </div>
-                    <h3 class="text-2xl font-extrabold text-white tracking-tight">Bs. {{ number_format($kpis['total_utility'], 2, ',', '.') }}</h3>
+                    <h3 class="text-2xl font-extrabold text-white tracking-tight">$ {{ number_format($kpis['total_utility'], 2, ',', '.') }}</h3>
                     <p class="text-xs text-gray-500 mt-2">Ganancia neta calculada en el mes</p>
                 </div>
 
@@ -380,9 +380,9 @@
                                     <span class="text-xs text-gray-450 block uppercase tracking-wider font-semibold">{{ $viewType === 'units' ? 'Total Unidades' : 'Total Ventas' }}</span>
                                     @if ($viewType === 'units')
                                         <span class="text-base font-extrabold text-white block">{{ number_format($client['total_qty'], 0, ',', '.') }} unidades</span>
-                                        <span class="text-[10px] text-gray-400 block">Bs. {{ number_format($client['total_sales'], 2, ',', '.') }} en ventas</span>
+                                        <span class="text-[10px] text-gray-400 block">$ {{ number_format($client['total_sales'], 2, ',', '.') }} en ventas</span>
                                     @else
-                                        <span class="text-base font-extrabold text-white block">Bs. {{ number_format($client['total_sales'], 2, ',', '.') }}</span>
+                                        <span class="text-base font-extrabold text-white block">$ {{ number_format($client['total_sales'], 2, ',', '.') }}</span>
                                         <span class="text-[10px] text-gray-400 block">{{ number_format($client['total_qty'], 0, ',', '.') }} unidades vendidas</span>
                                     @endif
                                 </div>
@@ -402,7 +402,7 @@
                                         <th class="px-6 py-3.5">Código Producto</th>
                                         <th class="px-6 py-3.5">Descripción</th>
                                         <th class="px-6 py-3.5 text-right">Cant. Vendida</th>
-                                        <th class="px-6 py-3.5 text-right">Ventas (Bs)</th>
+                                        <th class="px-6 py-3.5 text-right">Ventas ($)</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-white/5 text-xs text-gray-300">
@@ -411,7 +411,7 @@
                                             <td class="px-6 py-3 font-mono text-[11px] text-gray-400">{{ $item->product_code }}</td>
                                             <td class="px-6 py-3 text-white font-medium">{{ $item->product_description }}</td>
                                             <td class="px-6 py-3 text-right">{{ number_format($item->quantity, 0, ',', '.') }}</td>
-                                            <td class="px-6 py-3 text-right font-semibold text-white">Bs. {{ number_format($item->total_sales, 2, ',', '.') }}</td>
+                                            <td class="px-6 py-3 text-right font-semibold text-white">$ {{ number_format($item->total_sales, 2, ',', '.') }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -467,6 +467,13 @@
                             </svg>
                             <span id="selected-file-name"></span>
                         </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">Tasa de Cambio (Bs. por Dólar)</label>
+                        <input type="number" step="0.0001" name="exchange_rate" id="exchange_rate" required
+                            class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 placeholder-gray-505 transition-all text-gray-300"
+                            placeholder="Ej. 45.50">
                     </div>
 
                     <div class="flex items-center space-x-3.5 pt-4 border-t border-white/5">
@@ -682,7 +689,7 @@
             data: {
                 labels: trendLabels,
                 datasets: [{
-                    label: viewType === 'units' ? 'Unidades' : 'Facturación (Bs)',
+                    label: viewType === 'units' ? 'Unidades' : 'Facturación ($)',
                     data: trendTotals,
                     borderColor: '#a855f7',
                     borderWidth: 3,
@@ -705,7 +712,7 @@
                                 if (viewType === 'units') {
                                     return context.raw.toLocaleString('es-VE', {maximumFractionDigits: 0}) + ' unidades';
                                 } else {
-                                    return 'Bs. ' + context.raw.toLocaleString('es-VE', {minimumFractionDigits: 2});
+                                    return '$ ' + context.raw.toLocaleString('es-VE', {minimumFractionDigits: 2});
                                 }
                             }
                         }
@@ -719,7 +726,7 @@
                                 if (viewType === 'units') {
                                     return value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k';
                                 } else {
-                                    return 'Bs. ' + (value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k');
+                                    return '$ ' + (value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k');
                                 }
                             }
                         }
@@ -781,7 +788,7 @@
                                 if (viewType === 'units') {
                                     return label + ': ' + value.toLocaleString('es-VE', {maximumFractionDigits: 0}) + ' unidades (' + percentage + '%)';
                                 } else {
-                                    return label + ': Bs. ' + value.toLocaleString('es-VE', {minimumFractionDigits: 2}) + ' (' + percentage + '%)';
+                                    return label + ': $ ' + value.toLocaleString('es-VE', {minimumFractionDigits: 2}) + ' (' + percentage + '%)';
                                 }
                             }
                         }
@@ -805,7 +812,7 @@
             data: {
                 labels: productLabels,
                 datasets: [{
-                    label: viewType === 'units' ? 'Unidades' : 'Ventas (Bs)',
+                    label: viewType === 'units' ? 'Unidades' : 'Ventas ($)',
                     data: productTotals,
                     backgroundColor: productGradient,
                     borderColor: '#10b981',
@@ -826,7 +833,7 @@
                                 if (viewType === 'units') {
                                     return context.raw.toLocaleString('es-VE', {maximumFractionDigits: 0}) + ' unidades';
                                 } else {
-                                    return 'Bs. ' + context.raw.toLocaleString('es-VE', {minimumFractionDigits: 2});
+                                    return '$ ' + context.raw.toLocaleString('es-VE', {minimumFractionDigits: 2});
                                 }
                             }
                         }
@@ -840,7 +847,7 @@
                                 if (viewType === 'units') {
                                     return value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k';
                                 } else {
-                                    return 'Bs. ' + (value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k');
+                                    return '$ ' + (value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k');
                                 }
                             }
                         }
@@ -871,7 +878,7 @@
             data: {
                 labels: clientLabels,
                 datasets: [{
-                    label: viewType === 'units' ? 'Unidades' : 'Ventas (Bs)',
+                    label: viewType === 'units' ? 'Unidades' : 'Ventas ($)',
                     data: clientTotals,
                     backgroundColor: clientGradient,
                     borderColor: '#ec4899',
@@ -892,7 +899,7 @@
                                 if (viewType === 'units') {
                                     return context.raw.toLocaleString('es-VE', {maximumFractionDigits: 0}) + ' unidades';
                                 } else {
-                                    return 'Bs. ' + context.raw.toLocaleString('es-VE', {minimumFractionDigits: 2});
+                                    return '$ ' + context.raw.toLocaleString('es-VE', {minimumFractionDigits: 2});
                                 }
                             }
                         }
@@ -906,7 +913,7 @@
                                 if (viewType === 'units') {
                                     return value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k';
                                 } else {
-                                    return 'Bs. ' + (value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k');
+                                    return '$ ' + (value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k');
                                 }
                             }
                         }

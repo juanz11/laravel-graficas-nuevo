@@ -8,6 +8,7 @@ class Sale extends Model
 {
     protected $fillable = [
         'report_date',
+        'exchange_rate',
         'client_code',
         'client_name',
         'client_class',
@@ -22,6 +23,7 @@ class Sale extends Model
 
     protected $casts = [
         'report_date' => 'date',
+        'exchange_rate' => 'decimal:4',
         'quantity' => 'integer',
         'total_sales' => 'decimal:2',
         'total_cost' => 'decimal:2',

@@ -120,15 +120,61 @@ class SaleControllerTest extends TestCase
         $response->assertStatus(200);
         $salesByClient = $response->viewData('salesByClient');
 
-        // Only CLI001 should be returned, because CLI002 has a total_qty of -2 (<= 0)
-        $this->assertCount(1, $salesByClient);
+        // Both CLI001 and CLI002 should be returned, because we do not filter clients themselves
+        $this->assertCount(2, $salesByClient);
         
-        $clientOne = $salesByClient[0];
-        $this->assertEquals('CLI001', $clientOne['code']);
+        $clientOne = collect($salesByClient)->firstWhere('code', 'CLI001');
+        $this->assertNotNull($clientOne);
 
         // The items inside CLI001 should only contain PROD_POS, because PROD_NEG has -5 (<= 0)
         $items = $clientOne['items'];
         $this->assertCount(1, $items);
         $this->assertEquals('PROD_POS', $items[0]->product_code);
+
+        $clientTwo = collect($salesByClient)->firstWhere('code', 'CLI002');
+        $this->assertNotNull($clientTwo);
+
+        // The items inside CLI002 should be empty because it only had negative quantity products
+        $itemsTwo = $clientTwo['items'];
+        $this->assertCount(0, $itemsTwo);
+    }
+
+    /** @test */
+    public function test_it_converts_bs_to_usd_using_exchange_rate()
+    {
+        $user = User::factory()->create();
+
+        // 100.00 Bs / 40.00 rate = $2.50 USD
+        Sale::create([
+            'report_date' => '2026-06-01',
+            'exchange_rate' => 40.00,
+            'client_code' => 'CLI001',
+            'client_name' => 'Client One',
+            'client_class' => 'A',
+            'product_code' => 'PROD_POS',
+            'product_description' => 'Positive Item',
+            'quantity' => 10,
+            'total_sales' => 100.00,
+            'total_cost' => 80.00,
+            'total_utility' => 20.00,
+            'utility_percentage' => 20.00,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('dashboard', ['month' => '']));
+
+        $response->assertStatus(200);
+
+        // Verify KPIs are converted to USD
+        $kpis = $response->viewData('kpis');
+        $this->assertEquals(2.50, $kpis['total_sales']);
+        $this->assertEquals(2.00, $kpis['total_cost']);
+        $this->assertEquals(0.50, $kpis['total_utility']);
+
+        // Verify clients are converted to USD
+        $salesByClient = $response->viewData('salesByClient');
+        $this->assertCount(1, $salesByClient);
+        $clientOne = $salesByClient[0];
+        $this->assertEquals(2.50, $clientOne['total_sales']);
+        $this->assertEquals(2.50, $clientOne['items'][0]->total_sales);
     }
 }
