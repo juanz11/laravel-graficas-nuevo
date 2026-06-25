@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth')->group(function () {
     Route::get('/', [SaleController::class, 'index'])->name('dashboard');
     Route::post('/sales/import', [SaleController::class, 'import'])->name('sales.import');
+    Route::get('/manual-entry', [SaleController::class, 'showManualEntry'])->name('manual-entry');
+    Route::post('/manual-entry', [SaleController::class, 'storeManualEntry'])->name('manual-entry.store');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
 

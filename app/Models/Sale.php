@@ -19,6 +19,7 @@ class Sale extends Model
         'total_cost',
         'total_utility',
         'utility_percentage',
+        'is_manual',
     ];
 
     protected $casts = [

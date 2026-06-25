@@ -541,4 +541,124 @@ class SaleController extends Controller
 
         return $months[$monthNum] ?? 'Mes';
     }
+
+    /**
+     * Show the manual entry form.
+     */
+    public function showManualEntry()
+    {
+        // Get all unique clients
+        $clients = Sale::select('client_code', 'client_name')
+            ->distinct()
+            ->orderBy('client_name')
+            ->get();
+
+        // Get all unique products
+        $products = Sale::select('product_code', 'product_description')
+            ->distinct()
+            ->orderBy('product_description')
+            ->get();
+
+        return view('manual-entry', compact('clients', 'products'));
+    }
+
+    /**
+     * Store manually entered sale data.
+     */
+    public function storeManualEntry(Request $request)
+    {
+        $request->validate([
+            'month' => 'required|integer|min:1|max:12',
+            'year' => 'required|integer|min:2020|max:2099',
+            'client_code' => 'required|string',
+            'product_code' => 'required|string',
+            'quantity' => 'required|numeric|min:0',
+            'total_sales' => 'required|numeric|min:0',
+        ]);
+
+        \Log::info('Manual Entry Request:', [
+            'month' => $request->month,
+            'year' => $request->year,
+            'client_code' => $request->client_code,
+            'product_code' => $request->product_code,
+            'quantity' => $request->quantity,
+            'total_sales' => $request->total_sales,
+            'total_sales_type' => gettype($request->total_sales),
+        ]);
+
+        // Get client and product info from existing records
+        $existingSale = Sale::where('client_code', $request->client_code)
+            ->where('product_code', $request->product_code)
+            ->first();
+
+        if (!$existingSale) {
+            return back()->withErrors(['error' => 'No se encontró información para este cliente y producto. Asegúrate de que existan en los datos importados.']);
+        }
+
+        // Calculate report date (first day of selected month)
+        $reportDate = Carbon::create($request->year, $request->month, 1);
+
+        \Log::info('Report Date:', ['report_date' => $reportDate->format('Y-m-d')]);
+
+        // Check if there's already a sale record for this combination
+        $existingRecord = Sale::where('report_date', $reportDate)
+            ->where('client_code', $request->client_code)
+            ->where('product_code', $request->product_code)
+            ->first();
+
+        \Log::info('Existing Record Found:', ['found' => $existingRecord ? 'yes' : 'no']);
+        if ($existingRecord) {
+            \Log::info('Existing Record Values:', [
+                'quantity' => $existingRecord->quantity,
+                'total_sales' => $existingRecord->total_sales,
+            ]);
+        }
+
+        if ($existingRecord) {
+            // Update existing record
+            $existingRecord->quantity += $request->quantity;
+            $existingRecord->total_sales += (float) $request->total_sales;
+            $existingRecord->total_cost += ((float) $request->total_sales * 0.15); // Assuming 15% cost
+            $existingRecord->total_utility = $existingRecord->total_sales - $existingRecord->total_cost;
+            $existingRecord->utility_percentage = $existingRecord->total_sales > 0
+                ? ($existingRecord->total_utility / $existingRecord->total_sales) * 100
+                : 0;
+            $existingRecord->is_manual = true;
+            $existingRecord->exchange_rate = $existingRecord->exchange_rate ?? 1;
+            $existingRecord->save();
+
+            \Log::info('After Save (Update):', [
+                'quantity' => $existingRecord->quantity,
+                'total_sales' => $existingRecord->total_sales,
+                'exchange_rate' => $existingRecord->exchange_rate,
+            ]);
+        } else {
+            // Create new record
+            $totalCost = (float) $request->total_sales * 0.15; // Assuming 15% cost
+            $totalUtility = (float) $request->total_sales - $totalCost;
+            $utilityPercentage = (float) $request->total_sales > 0
+                ? ($totalUtility / (float) $request->total_sales) * 100
+                : 0;
+
+            Sale::create([
+                'report_date' => $reportDate,
+                'exchange_rate' => 1,
+                'client_code' => $request->client_code,
+                'client_name' => $existingSale->client_name,
+                'client_class' => $existingSale->client_class,
+                'product_code' => $request->product_code,
+                'product_description' => $existingSale->product_description,
+                'quantity' => $request->quantity,
+                'total_sales' => (float) $request->total_sales,
+                'total_cost' => $totalCost,
+                'total_utility' => $totalUtility,
+                'utility_percentage' => $utilityPercentage,
+                'is_manual' => true,
+            ]);
+        }
+
+        $monthLabel = $this->getSpanishMonthName($request->month) . ' ' . $request->year;
+
+        return redirect()->route('dashboard')->with('success', "Venta agregada correctamente a {$monthLabel}.");
+    }
 }

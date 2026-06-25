@@ -83,6 +83,14 @@
                         <span class="hidden sm:inline">Pantalla Completa</span>
                     </button>
 
+                    <a href="{{ route('manual-entry') }}" 
+                        class="text-xs font-semibold px-3 py-2 sm:px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-emerald-600/20">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        <span class="hidden sm:inline">Entrada Manual</span>
+                    </a>
+
                     <button onclick="toggleModal('import-modal')" 
                         class="text-xs font-semibold px-3 py-2 sm:px-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-purple-600/20">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
