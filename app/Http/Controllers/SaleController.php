@@ -59,7 +59,7 @@ class SaleController extends Controller
         if ($selectedMonthVal) {
             $query->whereDate('report_date', $selectedMonthVal);
         }
-        
+
         if ($selectedClient) {
             $query->where('client_code', $selectedClient);
         }
@@ -67,26 +67,28 @@ class SaleController extends Controller
         if ($selectedClass) {
             $query->where('client_class', $selectedClass);
         }
-        
+
         if ($selectedProduct) {
             $query->where(function ($q) use ($selectedProduct) {
                 $q->where('product_code', 'like', '%' . $selectedProduct . '%')
                   ->orWhere('product_description', 'like', '%' . $selectedProduct . '%');
             });
         }
-        
+
+        // Include all products including discounts (negative values will subtract from totals)
         $sales = $query->get();
 
         // 5. Calcular KPIs principales
         $totalSalesUsd = $sales->sum(fn($s) => $s->total_sales / ($s->exchange_rate ?: 1));
         $totalUtilityUsd = $sales->sum(fn($s) => $s->total_utility / ($s->exchange_rate ?: 1));
+
         $kpis = [
             'total_sales' => $totalSalesUsd,
             'total_cost' => $sales->sum(fn($s) => $s->total_cost / ($s->exchange_rate ?: 1)),
             'total_utility' => $totalUtilityUsd,
             'total_quantity' => $sales->sum('quantity'),
-            'utility_margin' => $totalSalesUsd > 0 
-                ? ($totalUtilityUsd / $totalSalesUsd) * 100 
+            'utility_margin' => $totalSalesUsd > 0
+                ? ($totalUtilityUsd / $totalSalesUsd) * 100
                 : 0,
         ];
 
@@ -101,27 +103,10 @@ class SaleController extends Controller
             ->orderBy($viewType === 'units' ? 'total_qty' : 'total_sales', 'desc')
             ->get();
 
-        // 7. Agrupar ventas por Cliente (respetando filtros de cliente, producto y clase si existen)
-        $clientQuery = Sale::query();
-        if ($selectedMonthVal) {
-            $clientQuery->whereDate('report_date', $selectedMonthVal);
-        }
-        if ($selectedClient) {
-            $clientQuery->where('client_code', $selectedClient);
-        }
-        if ($selectedClass) {
-            $clientQuery->where('client_class', $selectedClass);
-        }
-        if ($selectedProduct) {
-            $clientQuery->where(function ($q) use ($selectedProduct) {
-                $q->where('product_code', 'like', '%' . $selectedProduct . '%')
-                  ->orWhere('product_description', 'like', '%' . $selectedProduct . '%');
-            });
-        }
-        
-        $salesByClient = $clientQuery->get()->groupBy('client_code')->map(function ($clientSales) use ($viewType) {
+        // 7. Agrupar ventas por Cliente (usando la misma consulta base para consistencia)
+        $salesByClient = $sales->groupBy('client_code')->map(function ($clientSales) use ($viewType) {
             $first = $clientSales->first();
-            
+
             $groupedItems = $clientSales->groupBy('product_code')->map(function ($productSales) {
                 $firstProd = $productSales->first();
                 return (object)[
@@ -130,8 +115,6 @@ class SaleController extends Controller
                     'quantity' => $productSales->sum('quantity'),
                     'total_sales' => $productSales->sum(fn($s) => $s->total_sales / ($s->exchange_rate ?: 1)),
                 ];
-            })->filter(function ($item) {
-                return $item->quantity > 0;
             })->sortByDesc($viewType === 'units' ? 'quantity' : 'total_sales')->values();
 
             return [
@@ -164,7 +147,6 @@ class SaleController extends Controller
         $salesByProduct = $productQuery
             ->select('product_code', 'product_description', DB::raw('SUM(total_sales / COALESCE(exchange_rate, 1)) as total_sales'), DB::raw('SUM(quantity) as total_qty'))
             ->groupBy('product_code', 'product_description')
-            ->havingRaw('SUM(quantity) > 0')
             ->orderBy($viewType === 'units' ? 'total_qty' : 'total_sales', 'desc')
             ->limit(15)
             ->get();
