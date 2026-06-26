@@ -80,7 +80,7 @@
 
         @if ($errors->any())
             <div class="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-                <ul class="text-red-400 text-sm">
+                <ul class="text-red-400 text-sm space-y-1">
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
                     @endforeach
@@ -88,20 +88,20 @@
             </div>
         @endif
 
-        <div class="max-w-4xl mx-auto">
+        <div class="max-w-6xl mx-auto">
             <!-- Header -->
             <div class="mb-8">
                 <h1 class="text-3xl font-extrabold text-white tracking-tight">Entrada Manual de Ventas</h1>
-                <p class="text-gray-400 text-sm mt-1">Agregar ventas manualmente a un mes existente</p>
+                <p class="text-gray-400 text-sm mt-1">Agregar múltiples ventas manualmente a un mes existente</p>
             </div>
 
             <!-- Form -->
             <div class="glass-card rounded-2xl p-8">
-                <form action="{{ route('manual-entry.store') }}" method="POST">
+                <form action="{{ route('manual-entry.store') }}" method="POST" id="manual-entry-form">
                     @csrf
 
                     <!-- Month and Year Selection -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
                         <div>
                             <label for="month" class="block text-sm font-semibold text-gray-300 mb-2">Mes</label>
                             <select id="month" name="month" required
@@ -127,72 +127,188 @@
                                 class="w-full bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
                                 <option value="">Seleccionar año</option>
                                 @for ($i = date('Y'); $i >= date('Y') - 5; $i--)
-                                    <option value="{{ $i }}" {{ old('year') == $i ? 'selected' : '' }} class="bg-[#090714] text-white">
-                                        {{ $i }}
-                                    </option>
+                                    <option value="{{ $i }}" {{ old('year') == $i ? 'selected' : '' }} class="bg-[#090714] text-white">{{ $i }}</option>
                                 @endfor
                             </select>
                         </div>
                     </div>
 
-                    <!-- Client Selection -->
-                    <div class="mb-6">
-                        <label for="client_code" class="block text-sm font-semibold text-gray-300 mb-2">Cliente</label>
-                        <select id="client_code" name="client_code" required
-                            class="w-full bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
-                            <option value="">Seleccionar cliente</option>
-                            @foreach ($clients as $client)
-                                <option value="{{ $client->client_code }}" {{ old('client_code') == $client->client_code ? 'selected' : '' }} class="bg-[#090714] text-white">
-                                    {{ $client->client_name }} ({{ $client->client_code }})
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
+                    <!-- Client Blocks Container -->
+                    <div id="clients-container" class="space-y-6 mb-6"></div>
 
-                    <!-- Product Selection -->
-                    <div class="mb-6">
-                        <label for="product_code" class="block text-sm font-semibold text-gray-300 mb-2">Producto</label>
-                        <select id="product_code" name="product_code" required
-                            class="w-full bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
-                            <option value="">Seleccionar producto</option>
-                            @foreach ($products as $product)
-                                <option value="{{ $product->product_code }}" {{ old('product_code') == $product->product_code ? 'selected' : '' }} class="bg-[#090714] text-white">
-                                    {{ $product->product_description }} ({{ $product->product_code }})
-                                </option>
-                            @endforeach
-                        </select>
-                    </div>
-
-                    <!-- Quantity and Sales -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-                        <div>
-                            <label for="quantity" class="block text-sm font-semibold text-gray-300 mb-2">Cantidad Vendida</label>
-                            <input type="number" id="quantity" name="quantity" step="0.01" min="0" required
-                                value="{{ old('quantity') }}"
-                                class="w-full bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
-                                placeholder="0">
-                        </div>
-                        <div>
-                            <label for="total_sales" class="block text-sm font-semibold text-gray-300 mb-2">Ventas ($)</label>
-                            <input type="number" id="total_sales" name="total_sales" step="0.01" min="0" required
-                                value="{{ old('total_sales') }}"
-                                class="w-full bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
-                                placeholder="0.00">
-                        </div>
-                    </div>
+                    <!-- Add Client Button -->
+                    <button type="button" onclick="addClientBlock()"
+                        class="w-full py-3 border border-dashed border-purple-500/30 hover:border-purple-500/60 hover:bg-purple-500/5 text-gray-400 hover:text-purple-400 text-sm font-semibold rounded-xl transition-all flex items-center justify-center gap-2 mb-8">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        Agregar cliente
+                    </button>
 
                     <!-- Submit and Cancel Buttons -->
-                    <div class="flex items-center justify-end gap-4">
-                        <a href="{{ route('dashboard') }}" class="px-6 py-3 bg-white/5 hover:bg-white/10 text-white text-sm font-semibold rounded-xl transition-all">
-                            Cancelar
-                        </a>
-                        <button type="submit" class="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold rounded-xl transition-all">
-                            Guardar Venta
-                        </button>
+                    <div class="flex items-center justify-between gap-4 border-t border-white/5 pt-6">
+                        <span id="entry-count" class="text-xs text-gray-500">0 entradas</span>
+                        <div class="flex items-center gap-4">
+                            <a href="{{ route('dashboard') }}" class="px-6 py-3 bg-white/5 hover:bg-white/10 text-white text-sm font-semibold rounded-xl transition-all">
+                                Cancelar
+                            </a>
+                            <button type="submit" class="px-6 py-3 bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold rounded-xl transition-all flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                </svg>
+                                Guardar Ventas
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
         </div>
     </main>
+
+    <script>
+        const clientsData = @json($clients);
+        const productsData = @json($products);
+
+        let clientIdx = 0;
+        let entryIdx = 0;
+
+        function buildClientOptions() {
+            let html = '<option value="">Seleccionar cliente</option>';
+            clientsData.forEach(c => {
+                html += `<option value="${c.client_code}" class="bg-[#090714] text-white">${c.client_name} (${c.client_code})</option>`;
+            });
+            return html;
+        }
+
+        function buildProductOptions() {
+            let html = '<option value="">Seleccionar producto</option>';
+            productsData.forEach(p => {
+                html += `<option value="${p.product_code}" class="bg-[#090714] text-white">${p.product_description} (${p.product_code})</option>`;
+            });
+            return html;
+        }
+
+        function addClientBlock() {
+            const ci = clientIdx++;
+            const container = document.getElementById('clients-container');
+
+            const block = document.createElement('div');
+            block.className = 'client-block border border-white/10 rounded-2xl overflow-hidden';
+            block.dataset.clientIdx = ci;
+
+            block.innerHTML = `
+                <!-- Client Header -->
+                <div class="bg-white/[0.03] border-b border-white/5 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div class="flex-1">
+                        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Cliente</label>
+                        <select class="client-select w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all"
+                            onchange="updateClientHiddenFields(${ci}, this.value)"
+                            required>
+                            ${buildClientOptions()}
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0 mt-1 sm:mt-5">
+                        <button type="button" onclick="addProductRow(${ci})"
+                            class="px-3 py-2 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-400 hover:text-purple-300 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Agregar producto
+                        </button>
+                        <button type="button" onclick="removeClientBlock(this)"
+                            class="w-8 h-8 flex items-center justify-center rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-all border border-red-500/20">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Products Table Header -->
+                <div class="hidden sm:grid grid-cols-12 gap-3 px-5 py-2 bg-white/[0.01]">
+                    <div class="col-span-7 text-xs font-semibold text-gray-500 uppercase tracking-wider">Producto / Descripción</div>
+                    <div class="col-span-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Cant. Vendida</div>
+                    <div class="col-span-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Ventas ($)</div>
+                    <div class="col-span-1"></div>
+                </div>
+
+                <!-- Products Rows -->
+                <div class="products-container px-5 py-3 space-y-2" data-client-idx="${ci}"></div>
+            `;
+
+            container.appendChild(block);
+            addProductRow(ci);
+            updateEntryCount();
+        }
+
+        function updateClientHiddenFields(ci, clientCode) {
+            // Update all hidden client_code inputs in this block's product rows
+            const block = document.querySelector(`.client-block[data-client-idx="${ci}"]`);
+            if (!block) return;
+            block.querySelectorAll('.hidden-client-code').forEach(input => {
+                input.value = clientCode;
+            });
+        }
+
+        function addProductRow(ci) {
+            const ei = entryIdx++;
+            const productsContainer = document.querySelector(`.products-container[data-client-idx="${ci}"]`);
+            if (!productsContainer) return;
+
+            // Get current client code from the block's select
+            const block = document.querySelector(`.client-block[data-client-idx="${ci}"]`);
+            const clientCode = block ? block.querySelector('.client-select').value : '';
+
+            const row = document.createElement('div');
+            row.className = 'product-row grid grid-cols-12 gap-3 items-center py-1';
+            row.innerHTML = `
+                <input type="hidden" name="entries[${ei}][client_code]" class="hidden-client-code" value="${clientCode}">
+                <div class="col-span-12 sm:col-span-7">
+                    <select name="entries[${ei}][product_code]" required
+                        class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
+                        ${buildProductOptions()}
+                    </select>
+                </div>
+                <div class="col-span-5 sm:col-span-2">
+                    <input type="number" name="entries[${ei}][quantity]" step="1" min="0" required
+                        class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
+                        placeholder="0">
+                </div>
+                <div class="col-span-5 sm:col-span-2">
+                    <input type="number" name="entries[${ei}][total_sales]" step="0.01" required
+                        class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
+                        placeholder="0.00">
+                </div>
+                <div class="col-span-2 sm:col-span-1 flex justify-end">
+                    <button type="button" onclick="removeProductRow(this)"
+                        class="w-7 h-7 flex items-center justify-center rounded-lg bg-white/5 hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-all border border-white/5 hover:border-red-500/20">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            `;
+            productsContainer.appendChild(row);
+            updateEntryCount();
+        }
+
+        function removeProductRow(btn) {
+            btn.closest('.product-row').remove();
+            updateEntryCount();
+        }
+
+        function removeClientBlock(btn) {
+            btn.closest('.client-block').remove();
+            updateEntryCount();
+        }
+
+        function updateEntryCount() {
+            const count = document.querySelectorAll('.product-row').length;
+            document.getElementById('entry-count').textContent = count + (count === 1 ? ' entrada' : ' entradas');
+        }
+
+        // Add first client block on load
+        document.addEventListener('DOMContentLoaded', () => addClientBlock());
+    </script>
 </body>
 </html>

@@ -545,102 +545,87 @@ class SaleController extends Controller
     }
 
     /**
-     * Store manually entered sale data.
+     * Store manually entered sale data (multiple entries).
      */
     public function storeManualEntry(Request $request)
     {
         $request->validate([
-            'month' => 'required|integer|min:1|max:12',
-            'year' => 'required|integer|min:2020|max:2099',
-            'client_code' => 'required|string',
-            'product_code' => 'required|string',
-            'quantity' => 'required|numeric|min:0',
-            'total_sales' => 'required|numeric|min:0',
+            'month'   => 'required|integer|min:1|max:12',
+            'year'    => 'required|integer|min:2020|max:2099',
+            'entries' => 'required|array|min:1',
+            'entries.*.client_code'  => 'required|string',
+            'entries.*.product_code' => 'required|string',
+            'entries.*.quantity'     => 'required|numeric',
+            'entries.*.total_sales'  => 'required|numeric',
         ]);
 
-        \Log::info('Manual Entry Request:', [
-            'month' => $request->month,
-            'year' => $request->year,
-            'client_code' => $request->client_code,
-            'product_code' => $request->product_code,
-            'quantity' => $request->quantity,
-            'total_sales' => $request->total_sales,
-            'total_sales_type' => gettype($request->total_sales),
-        ]);
-
-        // Get client and product info from existing records
-        $existingSale = Sale::where('client_code', $request->client_code)
-            ->where('product_code', $request->product_code)
-            ->first();
-
-        if (!$existingSale) {
-            return back()->withErrors(['error' => 'No se encontró información para este cliente y producto. Asegúrate de que existan en los datos importados.']);
-        }
-
-        // Calculate report date (first day of selected month)
         $reportDate = Carbon::create($request->year, $request->month, 1);
+        $savedCount = 0;
+        $errors = [];
 
-        \Log::info('Report Date:', ['report_date' => $reportDate->format('Y-m-d')]);
+        foreach ($request->entries as $index => $entry) {
+            $clientCode  = $entry['client_code'];
+            $productCode = $entry['product_code'];
+            $quantity    = (float) $entry['quantity'];
+            $totalSales  = (float) $entry['total_sales'];
 
-        // Check if there's already a sale record for this combination
-        $existingRecord = Sale::where('report_date', $reportDate)
-            ->where('client_code', $request->client_code)
-            ->where('product_code', $request->product_code)
-            ->first();
+            // Get reference info from any existing record for this client+product
+            $reference = Sale::where('client_code', $clientCode)
+                ->where('product_code', $productCode)
+                ->first();
 
-        \Log::info('Existing Record Found:', ['found' => $existingRecord ? 'yes' : 'no']);
-        if ($existingRecord) {
-            \Log::info('Existing Record Values:', [
-                'quantity' => $existingRecord->quantity,
-                'total_sales' => $existingRecord->total_sales,
-            ]);
+            if (!$reference) {
+                $errors[] = "Fila " . ($index + 1) . ": No se encontró información para el cliente/producto seleccionado.";
+                continue;
+            }
+
+            // Check if a record already exists for this month+client+product
+            $existing = Sale::where('report_date', $reportDate)
+                ->where('client_code', $clientCode)
+                ->where('product_code', $productCode)
+                ->first();
+
+            if ($existing) {
+                $existing->quantity    += $quantity;
+                $existing->total_sales += $totalSales;
+                $existing->total_cost  += ($totalSales * 0.15);
+                $existing->total_utility    = $existing->total_sales - $existing->total_cost;
+                $existing->utility_percentage = $existing->total_sales > 0
+                    ? ($existing->total_utility / $existing->total_sales) * 100
+                    : 0;
+                $existing->is_manual    = true;
+                $existing->exchange_rate = $existing->exchange_rate ?? 1;
+                $existing->save();
+            } else {
+                $totalCost    = $totalSales * 0.15;
+                $totalUtility = $totalSales - $totalCost;
+
+                Sale::create([
+                    'report_date'        => $reportDate,
+                    'exchange_rate'      => 1,
+                    'client_code'        => $clientCode,
+                    'client_name'        => $reference->client_name,
+                    'client_class'       => $reference->client_class,
+                    'product_code'       => $productCode,
+                    'product_description'=> $reference->product_description,
+                    'quantity'           => $quantity,
+                    'total_sales'        => $totalSales,
+                    'total_cost'         => $totalCost,
+                    'total_utility'      => $totalUtility,
+                    'utility_percentage' => $totalSales > 0 ? ($totalUtility / $totalSales) * 100 : 0,
+                    'is_manual'          => true,
+                ]);
+            }
+
+            $savedCount++;
         }
 
-        if ($existingRecord) {
-            // Update existing record
-            $existingRecord->quantity += $request->quantity;
-            $existingRecord->total_sales += (float) $request->total_sales;
-            $existingRecord->total_cost += ((float) $request->total_sales * 0.15); // Assuming 15% cost
-            $existingRecord->total_utility = $existingRecord->total_sales - $existingRecord->total_cost;
-            $existingRecord->utility_percentage = $existingRecord->total_sales > 0
-                ? ($existingRecord->total_utility / $existingRecord->total_sales) * 100
-                : 0;
-            $existingRecord->is_manual = true;
-            $existingRecord->exchange_rate = $existingRecord->exchange_rate ?? 1;
-            $existingRecord->save();
-
-            \Log::info('After Save (Update):', [
-                'quantity' => $existingRecord->quantity,
-                'total_sales' => $existingRecord->total_sales,
-                'exchange_rate' => $existingRecord->exchange_rate,
-            ]);
-        } else {
-            // Create new record
-            $totalCost = (float) $request->total_sales * 0.15; // Assuming 15% cost
-            $totalUtility = (float) $request->total_sales - $totalCost;
-            $utilityPercentage = (float) $request->total_sales > 0
-                ? ($totalUtility / (float) $request->total_sales) * 100
-                : 0;
-
-            Sale::create([
-                'report_date' => $reportDate,
-                'exchange_rate' => 1,
-                'client_code' => $request->client_code,
-                'client_name' => $existingSale->client_name,
-                'client_class' => $existingSale->client_class,
-                'product_code' => $request->product_code,
-                'product_description' => $existingSale->product_description,
-                'quantity' => $request->quantity,
-                'total_sales' => (float) $request->total_sales,
-                'total_cost' => $totalCost,
-                'total_utility' => $totalUtility,
-                'utility_percentage' => $utilityPercentage,
-                'is_manual' => true,
-            ]);
+        if (!empty($errors)) {
+            return back()->withErrors($errors);
         }
 
         $monthLabel = $this->getSpanishMonthName($request->month) . ' ' . $request->year;
 
-        return redirect()->route('dashboard')->with('success', "Venta agregada correctamente a {$monthLabel}.");
+        return redirect()->route('dashboard')->with('success', "{$savedCount} venta(s) agregada(s) correctamente a {$monthLabel}.");
     }
 }
