@@ -172,7 +172,7 @@ class SaleController extends Controller
             ->select('product_code', 'product_description', DB::raw('SUM(total_sales / COALESCE(exchange_rate, 1)) as total_sales'), DB::raw('SUM(quantity) as total_qty'))
             ->groupBy('product_code', 'product_description')
             ->having(DB::raw('SUM(quantity)'), '>', 0)
-            ->orderBy('total_sales', 'desc')
+            ->orderBy('total_qty', 'desc')
             ->limit(15)
             ->get();
 
