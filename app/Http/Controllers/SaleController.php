@@ -151,6 +151,31 @@ class SaleController extends Controller
             ->limit(15)
             ->get();
 
+        // Separate query for Costo Promedio chart — always ordered by total_sales, independent of viewType
+        $avgCostProductQuery = Sale::query();
+        if ($selectedMonthVal) {
+            $avgCostProductQuery->whereDate('report_date', $selectedMonthVal);
+        }
+        if ($selectedClient) {
+            $avgCostProductQuery->where('client_code', $selectedClient);
+        }
+        if ($selectedClass) {
+            $avgCostProductQuery->where('client_class', $selectedClass);
+        }
+        if ($selectedProduct) {
+            $avgCostProductQuery->where(function ($q) use ($selectedProduct) {
+                $q->where('product_code', 'like', '%' . $selectedProduct . '%')
+                  ->orWhere('product_description', 'like', '%' . $selectedProduct . '%');
+            });
+        }
+        $salesByProductForAvgCost = $avgCostProductQuery
+            ->select('product_code', 'product_description', DB::raw('SUM(total_sales / COALESCE(exchange_rate, 1)) as total_sales'), DB::raw('SUM(quantity) as total_qty'))
+            ->groupBy('product_code', 'product_description')
+            ->having(DB::raw('SUM(quantity)'), '>', 0)
+            ->orderBy('total_sales', 'desc')
+            ->limit(15)
+            ->get();
+
         // 9. Calcular tendencia mensual de ventas para el gráfico de línea (respetando filtros de cliente, clase y producto si existen)
         $monthDateFormat = DB::connection()->getDriverName() === 'sqlite'
             ? "strftime('%Y-%m-01', report_date)"
@@ -229,6 +254,7 @@ class SaleController extends Controller
             'salesByClass' => $salesByClass,
             'salesByClient' => $salesByClient,
             'salesByProduct' => $salesByProduct,
+            'salesByProductForAvgCost' => $salesByProductForAvgCost,
             'monthlyTrend' => $monthlyTrend,
             'clientsList' => $clientsList,
             'classesList' => $classesList,

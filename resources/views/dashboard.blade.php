@@ -345,6 +345,20 @@
                 </div>
             </div>
 
+            <!-- Costo Promedio Scatter Chart -->
+            <div id="avg-cost-chart-container" class="glass-card rounded-2xl p-6 mb-8">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Costo Promedio por Producto</h3>
+                        <p class="text-xs text-gray-400 mt-0.5">Ventas ($) vs Cantidad vendida — cada punto es un producto</p>
+                    </div>
+                    <span class="text-xs text-gray-400">Línea = promedio general</span>
+                </div>
+                <div class="h-[480px] w-full relative">
+                    <canvas id="avgCostChart"></canvas>
+                </div>
+            </div>
+
             <!-- Search and Clients Section -->
             <div class="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <h3 class="text-xl font-bold text-white">Desglose de Ventas por Cliente</h3>
@@ -940,6 +954,119 @@
                         ticks: {
                             font: { size: 11 },
                             color: '#9ca3af'
+                        }
+                    }
+                }
+            }
+        });
+        // 5. Costo Promedio Chart — X: productos, Y: precio unitario promedio (ventas/cantidad)
+        // Uses a fixed dataset always ordered by total_sales, independent of viewType
+        const scatterRawData = {!! json_encode($salesByProductForAvgCost) !!};
+
+        const cpProducts = scatterRawData
+            .filter(p => parseFloat(p.total_qty) > 0)
+            .map(p => ({
+                label: p.product_description.length > 30 ? p.product_description.substring(0, 30) + '…' : p.product_description,
+                fullLabel: p.product_description,
+                qty: parseFloat(p.total_qty),
+                sales: parseFloat(p.total_sales),
+                unitPrice: parseFloat(p.total_sales) / parseFloat(p.total_qty)
+            }));
+
+        // Overall average unit price
+        const cpAvgPrice = cpProducts.reduce((s, p) => s + p.unitPrice, 0) / (cpProducts.length || 1);
+
+        const cpLabels    = cpProducts.map(p => p.label);
+        const cpUnitPrices = cpProducts.map(p => p.unitPrice);
+
+        const cpColors = [
+            '#a855f7','#6366f1','#ec4899','#10b981','#f59e0b',
+            '#06b6d4','#ef4444','#8b5cf6','#f97316','#14b8a6',
+            '#3b82f6','#84cc16','#e879f9','#fb7185','#34d399'
+        ];
+
+        const avgCostCtx = document.getElementById('avgCostChart').getContext('2d');
+        new Chart(avgCostCtx, {
+            type: 'line',
+            data: {
+                labels: cpLabels,
+                datasets: [
+                    // Smooth curve connecting product points
+                    {
+                        label: '_curve',
+                        data: cpUnitPrices,
+                        borderColor: 'rgba(139, 92, 246, 0.25)',
+                        borderWidth: 2,
+                        tension: 0.45,
+                        fill: false,
+                        pointBackgroundColor: cpColors.map((c, i) => (cpColors[i % cpColors.length]) + 'cc'),
+                        pointBorderColor: cpColors.map((c, i) => cpColors[i % cpColors.length]),
+                        pointRadius: 8,
+                        pointHoverRadius: 11,
+                        pointBorderWidth: 1.5,
+                        order: 2,
+                    },
+                    // Horizontal average line
+                    {
+                        label: 'Precio promedio',
+                        data: cpProducts.map(() => cpAvgPrice),
+                        borderColor: 'rgba(251, 191, 36, 0.75)',
+                        borderWidth: 2,
+                        borderDash: [6, 4],
+                        pointRadius: 0,
+                        fill: false,
+                        tension: 0,
+                        order: 1,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 14,
+                            font: { size: 10 },
+                            color: '#9ca3af',
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            filter: item => item.text !== '_curve'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                if (context.dataset.label === 'Precio promedio') {
+                                    return 'Precio prom. general: $ ' + cpAvgPrice.toLocaleString('es-VE', { minimumFractionDigits: 2 });
+                                }
+                                if (context.dataset.label === '_curve') {
+                                    const p = cpProducts[context.dataIndex];
+                                    return [
+                                        p.fullLabel,
+                                        'Precio unit: $ ' + p.unitPrice.toLocaleString('es-VE', { minimumFractionDigits: 2 }),
+                                        'Ventas: $ ' + p.sales.toLocaleString('es-VE', { minimumFractionDigits: 2 }),
+                                        'Cant: ' + p.qty.toLocaleString('es-VE', { maximumFractionDigits: 0 })
+                                    ];
+                                }
+                                return null;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Producto', color: '#6b7280', font: { size: 12 } },
+                        grid: { color: 'rgba(255,255,255,0.03)' },
+                        ticks: { color: '#6b7280', font: { size: 9 }, maxRotation: 35, minRotation: 25 }
+                    },
+                    y: {
+                        title: { display: true, text: 'Precio Unitario Promedio ($)', color: '#6b7280', font: { size: 12 } },
+                        grid: { color: 'rgba(255,255,255,0.04)' },
+                        ticks: {
+                            color: '#9ca3af',
+                            callback: v => '$ ' + (v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'k' : v.toFixed(0))
                         }
                     }
                 }
