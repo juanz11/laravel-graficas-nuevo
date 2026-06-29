@@ -181,9 +181,10 @@
                         <div class="relative">
                             <label for="view-type" class="sr-only">Tipo de Vista</label>
                             <select id="view-type" name="view_type" onchange="document.getElementById('filter-form').submit();"
+                                style="background-color: #0c0a18; color: #fff;"
                                 class="w-full sm:w-40 bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
-                                <option value="units" {{ !request('view_type') || request('view_type') === 'units' ? 'selected' : '' }} class="bg-[#090714] text-white">Unidades</option>
-                                <option value="sales" {{ request('view_type') === 'sales' ? 'selected' : '' }} class="bg-[#090714] text-white">Ventas ($)</option>
+                                <option value="units" {{ !request('view_type') || request('view_type') === 'units' ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Unidades</option>
+                                <option value="sales" {{ request('view_type') === 'sales' ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Ventas ($)</option>
                             </select>
                         </div>
 
@@ -191,10 +192,11 @@
                         <div class="relative">
                             <label for="month-select" class="sr-only">Seleccionar Mes</label>
                             <select id="month-select" name="month" onchange="document.getElementById('filter-form').submit();"
+                                style="background-color: #0c0a18; color: #fff;"
                                 class="w-full sm:w-48 bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
-                                <option value="">Todos los meses</option>
+                                <option value="" style="background-color: #0c0a18; color: #fff;">Todos los meses</option>
                                 @foreach ($months as $m)
-                                    <option value="{{ $m['val'] }}" {{ $m['val'] === $selectedMonthVal ? 'selected' : '' }} class="bg-[#090714] text-white">
+                                    <option value="{{ $m['val'] }}" {{ $m['val'] === $selectedMonthVal ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">
                                         {{ $m['label'] }}
                                     </option>
                                 @endforeach
@@ -205,10 +207,11 @@
                         <div class="relative">
                             <label for="class-select" class="sr-only">Seleccionar Clase</label>
                             <select id="class-select" name="class" onchange="document.getElementById('filter-form').submit();"
+                                style="background-color: #0c0a18; color: #fff;"
                                 class="w-full sm:w-48 bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
-                                <option value="">Todas las clases</option>
+                                <option value="" style="background-color: #0c0a18; color: #fff;">Todas las clases</option>
                                 @foreach ($classesList as $class)
-                                    <option value="{{ $class }}" {{ $class === $selectedClass ? 'selected' : '' }} class="bg-[#090714] text-white">
+                                    <option value="{{ $class }}" {{ $class === $selectedClass ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">
                                         {{ $class }}
                                     </option>
                                 @endforeach
@@ -219,10 +222,11 @@
                         <div class="relative">
                             <label for="client-select" class="sr-only">Seleccionar Cliente</label>
                             <select id="client-select" name="client" onchange="document.getElementById('filter-form').submit();"
+                                style="background-color: #0c0a18; color: #fff;"
                                 class="w-full sm:w-56 bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
-                                <option value="">Todos los clientes</option>
+                                <option value="" style="background-color: #0c0a18; color: #fff;">Todos los clientes</option>
                                 @foreach ($clientsList as $client)
-                                    <option value="{{ $client['code'] }}" {{ $client['code'] === $selectedClient ? 'selected' : '' }} class="bg-[#090714] text-white">
+                                    <option value="{{ $client['code'] }}" {{ $client['code'] === $selectedClient ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">
                                         {{ $client['name'] }}
                                     </option>
                                 @endforeach
