@@ -576,31 +576,32 @@ class SaleController extends Controller
     public function storeManualEntry(Request $request)
     {
         $request->validate([
-            'month'   => 'required|integer|min:1|max:12',
-            'year'    => 'required|integer|min:2020|max:2099',
-            'entries' => 'required|array|min:1',
+            'month'          => 'required|integer|min:1|max:12',
+            'year'           => 'required|integer|min:2020|max:2099',
+            'exchange_rate'  => 'required|numeric|gt:0',
+            'entries'        => 'required|array|min:1',
             'entries.*.client_code'  => 'required|string',
             'entries.*.product_code' => 'required|string',
             'entries.*.quantity'     => 'required|numeric',
-            'entries.*.total_sales'  => 'required|numeric',
+            'entries.*.total_sales_bs' => 'required|numeric',
         ]);
 
-        $reportDate = Carbon::create($request->year, $request->month, 1);
-        $savedCount = 0;
-        $errors = [];
+        $reportDate   = Carbon::create($request->year, $request->month, 1);
+        $exchangeRate = (float) $request->exchange_rate;
+        $savedCount   = 0;
+        $errors       = [];
 
         foreach ($request->entries as $index => $entry) {
-            $clientCode  = $entry['client_code'];
-            $productCode = $entry['product_code'];
-            $quantity    = (float) $entry['quantity'];
-            $totalSales  = (float) $entry['total_sales'];
+            $clientCode   = $entry['client_code'];
+            $productCode  = $entry['product_code'];
+            $quantity     = (float) $entry['quantity'];
+            $totalSalesBs = (float) $entry['total_sales_bs'];
 
-            // Get reference info from any existing record for this client+product
-            $reference = Sale::where('client_code', $clientCode)
-                ->where('product_code', $productCode)
-                ->first();
+            // Get reference info: client and product can exist separately; allow new combinations
+            $clientRef  = Sale::where('client_code', $clientCode)->first();
+            $productRef = Sale::where('product_code', $productCode)->first();
 
-            if (!$reference) {
+            if (!$clientRef || !$productRef) {
                 $errors[] = "Fila " . ($index + 1) . ": No se encontró información para el cliente/producto seleccionado.";
                 continue;
             }
@@ -611,34 +612,40 @@ class SaleController extends Controller
                 ->where('product_code', $productCode)
                 ->first();
 
+            // Totals are stored in Bs (same as Excel import); dashboard divides by exchange_rate
+            $totalCostBs    = $totalSalesBs * 0.15;
+            $totalUtilityBs = $totalSalesBs - $totalCostBs;
+
             if ($existing) {
-                $existing->quantity    += $quantity;
-                $existing->total_sales += $totalSales;
-                $existing->total_cost  += ($totalSales * 0.15);
-                $existing->total_utility    = $existing->total_sales - $existing->total_cost;
-                $existing->utility_percentage = $existing->total_sales > 0
-                    ? ($existing->total_utility / $existing->total_sales) * 100
+                $newQuantity       = $existing->quantity + $quantity;
+                $newTotalSalesBs   = $existing->total_sales + $totalSalesBs;
+                $newTotalCostBs    = $newTotalSalesBs * 0.15;
+                $newTotalUtilityBs = $newTotalSalesBs - $newTotalCostBs;
+
+                $existing->quantity           = $newQuantity;
+                $existing->total_sales        = $newTotalSalesBs;
+                $existing->total_cost         = $newTotalCostBs;
+                $existing->total_utility      = $newTotalUtilityBs;
+                $existing->utility_percentage = $newTotalSalesBs > 0
+                    ? ($newTotalUtilityBs / $newTotalSalesBs) * 100
                     : 0;
-                $existing->is_manual    = true;
-                $existing->exchange_rate = $existing->exchange_rate ?? 1;
+                $existing->is_manual          = true;
+                $existing->exchange_rate      = $exchangeRate;
                 $existing->save();
             } else {
-                $totalCost    = $totalSales * 0.15;
-                $totalUtility = $totalSales - $totalCost;
-
                 Sale::create([
                     'report_date'        => $reportDate,
-                    'exchange_rate'      => 1,
+                    'exchange_rate'      => $exchangeRate,
                     'client_code'        => $clientCode,
-                    'client_name'        => $reference->client_name,
-                    'client_class'       => $reference->client_class,
+                    'client_name'        => $clientRef->client_name,
+                    'client_class'       => $clientRef->client_class,
                     'product_code'       => $productCode,
-                    'product_description'=> $reference->product_description,
+                    'product_description'=> $productRef->product_description,
                     'quantity'           => $quantity,
-                    'total_sales'        => $totalSales,
-                    'total_cost'         => $totalCost,
-                    'total_utility'      => $totalUtility,
-                    'utility_percentage' => $totalSales > 0 ? ($totalUtility / $totalSales) * 100 : 0,
+                    'total_sales'        => $totalSalesBs,
+                    'total_cost'         => $totalCostBs,
+                    'total_utility'      => $totalUtilityBs,
+                    'utility_percentage' => $totalSalesBs > 0 ? ($totalUtilityBs / $totalSalesBs) * 100 : 0,
                     'is_manual'          => true,
                 ]);
             }

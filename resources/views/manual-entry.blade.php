@@ -100,36 +100,45 @@
                 <form action="{{ route('manual-entry.store') }}" method="POST" id="manual-entry-form">
                     @csrf
 
-                    <!-- Month and Year Selection -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+                    <!-- Month, Year and Exchange Rate Selection -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
                         <div>
                             <label for="month" class="block text-sm font-semibold text-gray-300 mb-2">Mes</label>
                             <select id="month" name="month" required
+                                style="background-color: #0c0a18; color: #fff;"
                                 class="w-full bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
-                                <option value="">Seleccionar mes</option>
-                                <option value="1" {{ old('month') == 1 ? 'selected' : '' }} class="bg-[#090714] text-white">Enero</option>
-                                <option value="2" {{ old('month') == 2 ? 'selected' : '' }} class="bg-[#090714] text-white">Febrero</option>
-                                <option value="3" {{ old('month') == 3 ? 'selected' : '' }} class="bg-[#090714] text-white">Marzo</option>
-                                <option value="4" {{ old('month') == 4 ? 'selected' : '' }} class="bg-[#090714] text-white">Abril</option>
-                                <option value="5" {{ old('month') == 5 ? 'selected' : '' }} class="bg-[#090714] text-white">Mayo</option>
-                                <option value="6" {{ old('month') == 6 ? 'selected' : '' }} class="bg-[#090714] text-white">Junio</option>
-                                <option value="7" {{ old('month') == 7 ? 'selected' : '' }} class="bg-[#090714] text-white">Julio</option>
-                                <option value="8" {{ old('month') == 8 ? 'selected' : '' }} class="bg-[#090714] text-white">Agosto</option>
-                                <option value="9" {{ old('month') == 9 ? 'selected' : '' }} class="bg-[#090714] text-white">Septiembre</option>
-                                <option value="10" {{ old('month') == 10 ? 'selected' : '' }} class="bg-[#090714] text-white">Octubre</option>
-                                <option value="11" {{ old('month') == 11 ? 'selected' : '' }} class="bg-[#090714] text-white">Noviembre</option>
-                                <option value="12" {{ old('month') == 12 ? 'selected' : '' }} class="bg-[#090714] text-white">Diciembre</option>
+                                <option value="" style="background-color: #0c0a18; color: #fff;">Seleccionar mes</option>
+                                <option value="1" {{ old('month') == 1 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Enero</option>
+                                <option value="2" {{ old('month') == 2 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Febrero</option>
+                                <option value="3" {{ old('month') == 3 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Marzo</option>
+                                <option value="4" {{ old('month') == 4 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Abril</option>
+                                <option value="5" {{ old('month') == 5 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Mayo</option>
+                                <option value="6" {{ old('month') == 6 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Junio</option>
+                                <option value="7" {{ old('month') == 7 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Julio</option>
+                                <option value="8" {{ old('month') == 8 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Agosto</option>
+                                <option value="9" {{ old('month') == 9 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Septiembre</option>
+                                <option value="10" {{ old('month') == 10 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Octubre</option>
+                                <option value="11" {{ old('month') == 11 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Noviembre</option>
+                                <option value="12" {{ old('month') == 12 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Diciembre</option>
                             </select>
                         </div>
                         <div>
                             <label for="year" class="block text-sm font-semibold text-gray-300 mb-2">Año</label>
                             <select id="year" name="year" required
+                                style="background-color: #0c0a18; color: #fff;"
                                 class="w-full bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
-                                <option value="">Seleccionar año</option>
+                                <option value="" style="background-color: #0c0a18; color: #fff;">Seleccionar año</option>
                                 @for ($i = date('Y'); $i >= date('Y') - 5; $i--)
-                                    <option value="{{ $i }}" {{ old('year') == $i ? 'selected' : '' }} class="bg-[#090714] text-white">{{ $i }}</option>
+                                    <option value="{{ $i }}" {{ old('year') == $i ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">{{ $i }}</option>
                                 @endfor
                             </select>
+                        </div>
+                        <div>
+                            <label for="exchange_rate" class="block text-sm font-semibold text-gray-300 mb-2">Tasa de cambio (Bs/$)</label>
+                            <input type="number" id="exchange_rate" name="exchange_rate" step="0.01" min="0.01" value="{{ old('exchange_rate', 1) }}" required
+                                class="w-full bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
+                                placeholder="Ej: 55.50">
+                            <p class="text-[11px] text-gray-500 mt-1.5">Ingrese monto en Bs por cada dólar</p>
                         </div>
                     </div>
 
@@ -228,7 +237,7 @@
                 <div class="hidden sm:grid grid-cols-12 gap-3 px-5 py-2 bg-white/[0.01]">
                     <div class="col-span-7 text-xs font-semibold text-gray-500 uppercase tracking-wider">Producto / Descripción</div>
                     <div class="col-span-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Cant. Vendida</div>
-                    <div class="col-span-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Ventas ($)</div>
+                    <div class="col-span-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Ventas (Bs)</div>
                     <div class="col-span-1"></div>
                 </div>
 
@@ -275,7 +284,7 @@
                         placeholder="0">
                 </div>
                 <div class="col-span-5 sm:col-span-2">
-                    <input type="number" name="entries[${ei}][total_sales]" step="0.01" required
+                    <input type="number" name="entries[${ei}][total_sales_bs]" step="0.01" required
                         class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
                         placeholder="0.00">
                 </div>
