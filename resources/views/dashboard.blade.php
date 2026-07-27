@@ -91,6 +91,15 @@
                         <span class="hidden sm:inline">Entrada Manual</span>
                     </a>
 
+                    <a href="{{ route('sales.list') }}" 
+                        class="text-xs font-semibold px-3 py-2 sm:px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-indigo-600/20">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        <span class="hidden sm:inline">Gestionar Ventas</span>
+                    </a>
+
                     <button onclick="toggleModal('import-modal')" 
                         class="text-xs font-semibold px-3 py-2 sm:px-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-purple-600/20">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -406,7 +415,6 @@
                                     <span class="text-xs text-gray-450 block uppercase tracking-wider font-semibold">{{ $viewType === 'units' ? 'Total Unidades' : 'Total Ventas' }}</span>
                                     @if ($viewType === 'units')
                                         <span class="text-base font-extrabold text-white block">{{ number_format($client['total_qty'], 0, ',', '.') }} unidades</span>
-                                        <span class="text-[10px] text-gray-400 block">$ {{ number_format($client['total_sales'], 2, ',', '.') }} en ventas</span>
                                     @else
                                         <span class="text-base font-extrabold text-white block">$ {{ number_format($client['total_sales'], 2, ',', '.') }}</span>
                                         <span class="text-[10px] text-gray-400 block">{{ number_format($client['total_qty'], 0, ',', '.') }} unidades vendidas</span>

@@ -10,6 +10,13 @@ Route::middleware('auth')->group(function () {
     Route::post('/sales/import', [SaleController::class, 'import'])->name('sales.import');
     Route::get('/manual-entry', [SaleController::class, 'showManualEntry'])->name('manual-entry');
     Route::post('/manual-entry', [SaleController::class, 'storeManualEntry'])->name('manual-entry.store');
+    
+    // Rutas para gestionar ventas
+    Route::get('/sales', [SaleController::class, 'list'])->name('sales.list');
+    Route::get('/sales/{id}/edit', [SaleController::class, 'editJson'])->name('sales.edit-json');
+    Route::post('/sales/{id}/update', [SaleController::class, 'update'])->name('sales.update');
+    Route::delete('/sales/{id}', [SaleController::class, 'destroy'])->name('sales.destroy');
+
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
 

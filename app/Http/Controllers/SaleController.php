@@ -661,4 +661,136 @@ class SaleController extends Controller
 
         return redirect()->route('dashboard')->with('success', "{$savedCount} venta(s) agregada(s) correctamente a {$monthLabel}.");
     }
+
+    /**
+     * List sales with filtering and pagination.
+     */
+    public function list(Request $request)
+    {
+        $query = Sale::query();
+
+        // 1. Filtrado por mes
+        $selectedMonthVal = $request->input('month');
+        if ($selectedMonthVal) {
+            $query->whereDate('report_date', $selectedMonthVal);
+        }
+
+        // 2. Filtrado por cliente
+        $selectedClient = $request->input('client');
+        if ($selectedClient) {
+            $query->where('client_code', $selectedClient);
+        }
+
+        // 3. Búsqueda por producto o texto general
+        $search = $request->input('search');
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('product_code', 'like', '%' . $search . '%')
+                  ->orWhere('product_description', 'like', '%' . $search . '%')
+                  ->orWhere('client_name', 'like', '%' . $search . '%')
+                  ->orWhere('client_code', 'like', '%' . $search . '%');
+            });
+        }
+
+        // Obtener los registros paginados (50 por página)
+        $sales = $query->orderBy('report_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->paginate(50)
+            ->withQueryString();
+
+        // Obtener meses disponibles para el filtro
+        $availableDates = Sale::select('report_date')
+            ->distinct()
+            ->orderBy('report_date', 'desc')
+            ->pluck('report_date');
+
+        $months = $availableDates->map(function ($date) {
+            $carbon = Carbon::parse($date);
+            return [
+                'val' => $carbon->format('Y-m-d'),
+                'label' => $this->getSpanishMonthName($carbon->month) . ' ' . $carbon->year,
+            ];
+        });
+
+        // Obtener lista completa de clientes únicos
+        $clients = Sale::select('client_code', 'client_name')
+            ->distinct()
+            ->orderBy('client_name')
+            ->get();
+
+        // Obtener lista completa de productos únicos
+        $products = Sale::select('product_code', 'product_description')
+            ->distinct()
+            ->orderBy('product_description')
+            ->get();
+
+        return view('sales', compact('sales', 'months', 'clients', 'products', 'selectedMonthVal', 'selectedClient', 'search'));
+    }
+
+    /**
+     * Get sale details in JSON format.
+     */
+    public function editJson($id)
+    {
+        $sale = Sale::findOrFail($id);
+        
+        $carbonDate = Carbon::parse($sale->report_date);
+        $sale->month = $carbonDate->format('n');
+        $sale->year = $carbonDate->format('Y');
+
+        return response()->json($sale);
+    }
+
+    /**
+     * Update an existing sale.
+     */
+    public function update(Request $request, $id)
+    {
+        $request->validate([
+            'month'          => 'required|integer|min:1|max:12',
+            'year'           => 'required|integer|min:2020|max:2099',
+            'exchange_rate'  => 'required|numeric|gt:0',
+            'client_code'    => 'required|string',
+            'product_code'   => 'required|string',
+            'quantity'       => 'required|numeric',
+            'total_sales'    => 'required|numeric',
+            'total_cost'     => 'required|numeric',
+            'total_utility'  => 'required|numeric',
+        ]);
+
+        $sale = Sale::findOrFail($id);
+
+        $clientRef  = Sale::where('client_code', $request->client_code)->first();
+        $productRef = Sale::where('product_code', $request->product_code)->first();
+
+        $reportDate = Carbon::create($request->year, $request->month, 1);
+
+        $sale->report_date        = $reportDate;
+        $sale->exchange_rate      = (float) $request->exchange_rate;
+        $sale->client_code        = $request->client_code;
+        $sale->client_name        = $clientRef ? $clientRef->client_name : $sale->client_name;
+        $sale->client_class       = $clientRef ? $clientRef->client_class : $sale->client_class;
+        $sale->product_code       = $request->product_code;
+        $sale->product_description = $productRef ? $productRef->product_description : $sale->product_description;
+        $sale->quantity           = (float) $request->quantity;
+        $sale->total_sales        = (float) $request->total_sales;
+        $sale->total_cost         = (float) $request->total_cost;
+        $sale->total_utility      = (float) $request->total_utility;
+        $sale->utility_percentage = $request->total_sales > 0 ? ($sale->total_utility / $sale->total_sales) * 100 : 0;
+        
+        $sale->save();
+
+        return back()->with('success', 'El registro de venta ha sido actualizado correctamente.');
+    }
+
+    /**
+     * Delete a sale.
+     */
+    public function destroy($id)
+    {
+        $sale = Sale::findOrFail($id);
+        $sale->delete();
+
+        return back()->with('success', 'El registro de venta ha sido eliminado correctamente.');
+    }
 }
