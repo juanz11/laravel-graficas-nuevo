@@ -663,6 +663,132 @@ class SaleController extends Controller
     }
 
     /**
+     * Show the manual entry form pre-filled with a full month of sales.
+     */
+    public function editMonth($date)
+    {
+        try {
+            $carbonDate = Carbon::parse($date);
+        } catch (\Exception $e) {
+            return redirect()->route('dashboard')->withErrors(['date' => 'La fecha del mes no es válida.']);
+        }
+
+        $sales = Sale::whereDate('report_date', $carbonDate->format('Y-m-d'))->get();
+
+        if ($sales->isEmpty()) {
+            return redirect()->route('dashboard')->withErrors(['month' => 'No hay ventas registradas para el mes seleccionado.']);
+        }
+
+        $exchangeRate = $sales->first()->exchange_rate;
+
+        $existingEntries = $sales->groupBy('client_code')->map(function ($items) {
+            return [
+                'client_code' => $items->first()->client_code,
+                'client_name' => $items->first()->client_name,
+                'products' => $items->map(function ($s) {
+                    return [
+                        'product_code' => $s->product_code,
+                        'product_description' => $s->product_description,
+                        'quantity' => $s->quantity,
+                        'total_sales_bs' => $s->total_sales,
+                    ];
+                })->values(),
+            ];
+        })->values();
+
+        $clients = Sale::select('client_code', 'client_name')->distinct()->orderBy('client_name')->get();
+        $products = Sale::select('product_code', 'product_description')->distinct()->orderBy('product_description')->get();
+
+        $editMonthLabel = $this->getSpanishMonthName($carbonDate->month) . ' ' . $carbonDate->year;
+
+        return view('manual-entry', [
+            'editDate' => $carbonDate->format('Y-m-d'),
+            'editMonth' => $carbonDate->month,
+            'editYear' => $carbonDate->year,
+            'editMonthLabel' => $editMonthLabel,
+            'editExchangeRate' => $exchangeRate,
+            'existingEntries' => $existingEntries,
+            'clients' => $clients,
+            'products' => $products,
+        ]);
+    }
+
+    /**
+     * Replace all sales for a given month using the manual entry form data.
+     */
+    public function updateMonth(Request $request, $date)
+    {
+        $request->validate([
+            'exchange_rate' => 'required|numeric|gt:0',
+            'entries' => 'required|array|min:1',
+            'entries.*.client_code' => 'required|string',
+            'entries.*.product_code' => 'required|string',
+            'entries.*.quantity' => 'required|numeric',
+            'entries.*.total_sales_bs' => 'required|numeric',
+        ]);
+
+        try {
+            $reportDate = Carbon::parse($date);
+        } catch (\Exception $e) {
+            return back()->withErrors(['date' => 'La fecha del mes no es válida.'])->withInput();
+        }
+
+        $exchangeRate = (float) $request->exchange_rate;
+
+        // Load client/product reference names before clearing the month
+        $clientCodes = collect($request->entries)->pluck('client_code')->unique()->filter()->values();
+        $productCodes = collect($request->entries)->pluck('product_code')->unique()->filter()->values();
+
+        $clientMap = Sale::whereIn('client_code', $clientCodes)->get()->keyBy('client_code');
+        $productMap = Sale::whereIn('product_code', $productCodes)->get()->keyBy('product_code');
+
+        $records = [];
+        foreach ($request->entries as $index => $entry) {
+            $clientCode = $entry['client_code'];
+            $productCode = $entry['product_code'];
+            $quantity = (float) $entry['quantity'];
+            $totalSalesBs = (float) $entry['total_sales_bs'];
+
+            $clientRef = $clientMap->get($clientCode);
+            $productRef = $productMap->get($productCode);
+
+            if (!$clientRef || !$productRef) {
+                return back()->withErrors(['entries' => 'Fila ' . ($index + 1) . ': No se encontró información para el cliente/producto seleccionado.'])->withInput();
+            }
+
+            $totalCostBs = $totalSalesBs * 0.15;
+            $totalUtilityBs = $totalSalesBs - $totalCostBs;
+
+            $records[] = [
+                'report_date' => $reportDate->format('Y-m-d'),
+                'exchange_rate' => $exchangeRate,
+                'client_code' => $clientCode,
+                'client_name' => $clientRef->client_name,
+                'client_class' => $clientRef->client_class,
+                'product_code' => $productCode,
+                'product_description' => $productRef->product_description,
+                'quantity' => $quantity,
+                'total_sales' => $totalSalesBs,
+                'total_cost' => $totalCostBs,
+                'total_utility' => $totalUtilityBs,
+                'utility_percentage' => $totalSalesBs > 0 ? ($totalUtilityBs / $totalSalesBs) * 100 : 0,
+                'is_manual' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        DB::transaction(function () use ($reportDate, $records) {
+            Sale::whereDate('report_date', $reportDate->format('Y-m-d'))->delete();
+            Sale::insert($records);
+        });
+
+        $monthLabel = $this->getSpanishMonthName($reportDate->month) . ' ' . $reportDate->year;
+
+        return redirect()->route('dashboard', ['month' => $reportDate->format('Y-m-d')])->with('success', "Se reemplazaron " . count($records) . " registros de {$monthLabel}.");
+    }
+
+    /**
      * List sales with filtering and pagination.
      */
     public function list(Request $request)

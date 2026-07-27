@@ -91,51 +91,62 @@
         <div class="max-w-6xl mx-auto">
             <!-- Header -->
             <div class="mb-8">
-                <h1 class="text-3xl font-extrabold text-white tracking-tight">Entrada Manual de Ventas</h1>
-                <p class="text-gray-400 text-sm mt-1">Agregar múltiples ventas manualmente a un mes existente</p>
+                <h1 class="text-3xl font-extrabold text-white tracking-tight">{{ isset($editDate) ? 'Editar ventas de ' . $editMonthLabel : 'Entrada Manual de Ventas' }}</h1>
+                <p class="text-gray-400 text-sm mt-1">{{ isset($editDate) ? 'Modifica los clientes y productos. Al guardar se reemplazarán todos los registros de este mes.' : 'Agregar múltiples ventas manualmente a un mes existente' }}</p>
             </div>
 
             <!-- Form -->
             <div class="glass-card rounded-2xl p-8">
-                <form action="{{ route('manual-entry.store') }}" method="POST" id="manual-entry-form">
+                <form action="{{ isset($editDate) ? route('manual-entry.update', ['date' => $editDate]) : route('manual-entry.store') }}" method="POST" id="manual-entry-form">
                     @csrf
 
                     <!-- Month, Year and Exchange Rate Selection -->
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-                        <div>
-                            <label for="month" class="block text-sm font-semibold text-gray-300 mb-2">Mes</label>
-                            <select id="month" name="month" required
-                                style="background-color: #0c0a18; color: #fff;"
-                                class="w-full bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
-                                <option value="" style="background-color: #0c0a18; color: #fff;">Seleccionar mes</option>
-                                <option value="1" {{ old('month') == 1 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Enero</option>
-                                <option value="2" {{ old('month') == 2 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Febrero</option>
-                                <option value="3" {{ old('month') == 3 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Marzo</option>
-                                <option value="4" {{ old('month') == 4 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Abril</option>
-                                <option value="5" {{ old('month') == 5 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Mayo</option>
-                                <option value="6" {{ old('month') == 6 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Junio</option>
-                                <option value="7" {{ old('month') == 7 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Julio</option>
-                                <option value="8" {{ old('month') == 8 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Agosto</option>
-                                <option value="9" {{ old('month') == 9 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Septiembre</option>
-                                <option value="10" {{ old('month') == 10 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Octubre</option>
-                                <option value="11" {{ old('month') == 11 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Noviembre</option>
-                                <option value="12" {{ old('month') == 12 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Diciembre</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="year" class="block text-sm font-semibold text-gray-300 mb-2">Año</label>
-                            <select id="year" name="year" required
-                                style="background-color: #0c0a18; color: #fff;"
-                                class="w-full bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
-                                <option value="" style="background-color: #0c0a18; color: #fff;">Seleccionar año</option>
-                                @for ($i = date('Y'); $i >= date('Y') - 5; $i--)
-                                    <option value="{{ $i }}" {{ old('year') == $i ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">{{ $i }}</option>
-                                @endfor
-                            </select>
-                        </div>
+                        @if (isset($editDate))
+                            <input type="hidden" name="month" value="{{ $editMonth }}">
+                            <input type="hidden" name="year" value="{{ $editYear }}">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-300 mb-2">Mes</label>
+                                <input type="text" disabled value="{{ $editMonthLabel }}"
+                                    class="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 text-white text-sm opacity-60 cursor-not-allowed">
+                            </div>
+                            <div class="hidden sm:block"></div>
+                        @else
+                            <div>
+                                <label for="month" class="block text-sm font-semibold text-gray-300 mb-2">Mes</label>
+                                <select id="month" name="month" required
+                                    style="background-color: #0c0a18; color: #fff;"
+                                    class="w-full bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
+                                    <option value="" style="background-color: #0c0a18; color: #fff;">Seleccionar mes</option>
+                                    <option value="1" {{ old('month') == 1 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Enero</option>
+                                    <option value="2" {{ old('month') == 2 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Febrero</option>
+                                    <option value="3" {{ old('month') == 3 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Marzo</option>
+                                    <option value="4" {{ old('month') == 4 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Abril</option>
+                                    <option value="5" {{ old('month') == 5 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Mayo</option>
+                                    <option value="6" {{ old('month') == 6 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Junio</option>
+                                    <option value="7" {{ old('month') == 7 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Julio</option>
+                                    <option value="8" {{ old('month') == 8 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Agosto</option>
+                                    <option value="9" {{ old('month') == 9 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Septiembre</option>
+                                    <option value="10" {{ old('month') == 10 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Octubre</option>
+                                    <option value="11" {{ old('month') == 11 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Noviembre</option>
+                                    <option value="12" {{ old('month') == 12 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">Diciembre</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="year" class="block text-sm font-semibold text-gray-300 mb-2">Año</label>
+                                <select id="year" name="year" required
+                                    style="background-color: #0c0a18; color: #fff;"
+                                    class="w-full bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
+                                    <option value="" style="background-color: #0c0a18; color: #fff;">Seleccionar año</option>
+                                    @for ($i = date('Y'); $i >= date('Y') - 5; $i--)
+                                        <option value="{{ $i }}" {{ old('year') == $i ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">{{ $i }}</option>
+                                    @endfor
+                                </select>
+                            </div>
+                        @endif
                         <div>
                             <label for="exchange_rate" class="block text-sm font-semibold text-gray-300 mb-2">Tasa de cambio (Bs/$)</label>
-                            <input type="number" id="exchange_rate" name="exchange_rate" step="0.01" min="0.01" value="{{ old('exchange_rate', 1) }}" required
+                            <input type="number" id="exchange_rate" name="exchange_rate" step="0.01" min="0.01" value="{{ old('exchange_rate', isset($editExchangeRate) ? $editExchangeRate : 1) }}" required
                                 class="w-full bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
                                 placeholder="Ej: 55.50">
                             <p class="text-[11px] text-gray-500 mt-1.5">Ingrese monto en Bs por cada dólar</p>
@@ -177,6 +188,7 @@
     <script>
         const clientsData = @json($clients);
         const productsData = @json($products);
+        const existingEntries = @json($existingEntries ?? []);
 
         let clientIdx = 0;
         let entryIdx = 0;
@@ -197,7 +209,7 @@
             return html;
         }
 
-        function addClientBlock() {
+        function addClientBlock(data = null) {
             const ci = clientIdx++;
             const container = document.getElementById('clients-container');
 
@@ -246,7 +258,20 @@
             `;
 
             container.appendChild(block);
-            addProductRow(ci);
+
+            if (data) {
+                const clientSelect = block.querySelector('.client-select');
+                clientSelect.value = data.client_code;
+                updateClientHiddenFields(ci, data.client_code);
+                if (data.products && data.products.length > 0) {
+                    data.products.forEach(p => addProductRow(ci, p));
+                } else {
+                    addProductRow(ci);
+                }
+            } else {
+                addProductRow(ci);
+            }
+
             updateEntryCount();
         }
 
@@ -259,7 +284,7 @@
             });
         }
 
-        function addProductRow(ci) {
+        function addProductRow(ci, productData = null) {
             const ei = entryIdx++;
             const productsContainer = document.querySelector(`.products-container[data-client-idx="${ci}"]`);
             if (!productsContainer) return;
@@ -298,6 +323,16 @@
                 </div>
             `;
             productsContainer.appendChild(row);
+
+            if (productData) {
+                const select = row.querySelector('select');
+                if (select) select.value = productData.product_code;
+                const qtyInput = row.querySelector('input[step="1"]');
+                if (qtyInput) qtyInput.value = productData.quantity;
+                const salesInput = row.querySelector('input[step="0.01"]');
+                if (salesInput) salesInput.value = productData.total_sales_bs;
+            }
+
             updateEntryCount();
         }
 
@@ -316,8 +351,14 @@
             document.getElementById('entry-count').textContent = count + (count === 1 ? ' entrada' : ' entradas');
         }
 
-        // Add first client block on load
-        document.addEventListener('DOMContentLoaded', () => addClientBlock());
+        // Pre-populate on load
+        document.addEventListener('DOMContentLoaded', () => {
+            if (existingEntries.length > 0) {
+                existingEntries.forEach(e => addClientBlock(e));
+            } else {
+                addClientBlock();
+            }
+        });
     </script>
 </body>
 </html>
