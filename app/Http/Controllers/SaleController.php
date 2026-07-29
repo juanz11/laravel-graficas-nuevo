@@ -673,7 +673,9 @@ class SaleController extends Controller
             return redirect()->route('dashboard')->withErrors(['date' => 'La fecha del mes no es válida.']);
         }
 
-        $sales = Sale::whereDate('report_date', $carbonDate->format('Y-m-d'))->get();
+        $sales = Sale::whereYear('report_date', $carbonDate->year)
+            ->whereMonth('report_date', $carbonDate->month)
+            ->get();
 
         if ($sales->isEmpty()) {
             return redirect()->route('dashboard')->withErrors(['month' => 'No hay ventas registradas para el mes seleccionado.']);
@@ -691,6 +693,7 @@ class SaleController extends Controller
                         'product_description' => $s->product_description,
                         'quantity' => $s->quantity,
                         'total_sales_bs' => $s->total_sales,
+                        'is_manual' => $s->is_manual,
                     ];
                 })->values(),
             ];
@@ -772,14 +775,16 @@ class SaleController extends Controller
                 'total_cost' => $totalCostBs,
                 'total_utility' => $totalUtilityBs,
                 'utility_percentage' => $totalSalesBs > 0 ? ($totalUtilityBs / $totalSalesBs) * 100 : 0,
-                'is_manual' => true,
+                'is_manual' => !empty($entry['is_manual']),
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
         }
 
         DB::transaction(function () use ($reportDate, $records) {
-            Sale::whereDate('report_date', $reportDate->format('Y-m-d'))->delete();
+            Sale::whereYear('report_date', $reportDate->year)
+                ->whereMonth('report_date', $reportDate->month)
+                ->delete();
             Sale::insert($records);
         });
 

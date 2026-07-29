@@ -293,11 +293,15 @@
             const block = document.querySelector(`.client-block[data-client-idx="${ci}"]`);
             const clientCode = block ? block.querySelector('.client-select').value : '';
 
+            const isManual = productData ? !!productData.is_manual : false;
+
             const row = document.createElement('div');
             row.className = 'product-row grid grid-cols-12 gap-3 items-center py-1';
             row.innerHTML = `
                 <input type="hidden" name="entries[${ei}][client_code]" class="hidden-client-code" value="${clientCode}">
+                ${isManual ? `<input type="hidden" name="entries[${ei}][is_manual]" value="1">` : ''}
                 <div class="col-span-12 sm:col-span-7">
+                    ${isManual ? '<div class="text-[10px] font-bold text-purple-400 mb-1 uppercase tracking-wide">Registro Manual</div>' : ''}
                     <select name="entries[${ei}][product_code]" required
                         class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
                         ${buildProductOptions()}
