@@ -372,7 +372,7 @@
             <div id="avg-cost-chart-container" class="glass-card rounded-2xl p-6 mb-8">
                 <div class="flex justify-between items-center mb-4">
                     <div>
-                        <h3 class="text-lg font-bold text-white">Costo Promedio por Producto</h3>
+                        <h3 class="text-lg font-bold text-white">Precio Promedio por Producto</h3>
                         <p class="text-xs text-gray-400 mt-0.5">Ventas ($) vs Cantidad vendida — cada punto es un producto</p>
                     </div>
                     <span class="text-xs text-gray-400">Línea = promedio general</span>
@@ -1036,6 +1036,10 @@
                         borderWidth: 2,
                         borderDash: [6, 4],
                         pointRadius: 0,
+                        pointHitRadius: 12,
+                        pointHoverRadius: 5,
+                        pointHoverBackgroundColor: 'rgba(251, 191, 36, 1)',
+                        pointHoverBorderColor: 'rgba(251, 191, 36, 1)',
                         fill: false,
                         tension: 0,
                         order: 1,
@@ -1059,9 +1063,15 @@
                     },
                     tooltip: {
                         callbacks: {
+                            title: function(items) {
+                                if (items.length && items[0].dataset.label === 'Precio promedio') {
+                                    return 'Promedio general';
+                                }
+                                return items.length ? items[0].label : '';
+                            },
                             label: function(context) {
                                 if (context.dataset.label === 'Precio promedio') {
-                                    return 'Precio prom. general: $ ' + cpAvgPrice.toLocaleString('es-VE', { minimumFractionDigits: 2 });
+                                    return '$ ' + cpAvgPrice.toLocaleString('es-VE', { minimumFractionDigits: 2 });
                                 }
                                 if (context.dataset.label === '_curve') {
                                     const p = cpProducts[context.dataIndex];

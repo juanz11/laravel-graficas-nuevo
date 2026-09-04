@@ -173,7 +173,6 @@ class SaleController extends Controller
             ->groupBy('product_code', 'product_description')
             ->having(DB::raw('SUM(quantity)'), '>', 0)
             ->orderBy('total_qty', 'desc')
-            ->limit(15)
             ->get();
 
         // 9. Calcular tendencia mensual de ventas para el gráfico de línea (respetando filtros de cliente, clase y producto si existen)
