@@ -793,6 +793,29 @@ class SaleController extends Controller
     }
 
     /**
+     * Update only the exchange rate for all sales of a given month.
+     * Does not modify quantities or any other field.
+     */
+    public function updateRate(Request $request)
+    {
+        $request->validate([
+            'month'         => 'required|date',
+            'exchange_rate' => 'required|numeric|gt:0',
+        ]);
+
+        $reportDate = Carbon::parse($request->month);
+
+        $updated = Sale::whereYear('report_date', $reportDate->year)
+            ->whereMonth('report_date', $reportDate->month)
+            ->update(['exchange_rate' => (float) $request->exchange_rate]);
+
+        $monthLabel = $this->getSpanishMonthName($reportDate->month) . ' ' . $reportDate->year;
+
+        return redirect()->route('dashboard', ['month' => $reportDate->format('Y-m-d')])
+            ->with('success', "Tasa de cambio actualizada en {$updated} registro(s) de {$monthLabel}.");
+    }
+
+    /**
      * List sales with filtering and pagination.
      */
     public function list(Request $request)

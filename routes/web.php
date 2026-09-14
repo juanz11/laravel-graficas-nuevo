@@ -12,6 +12,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/manual-entry', [SaleController::class, 'storeManualEntry'])->name('manual-entry.store');
     Route::get('/manual-entry/{date}/edit', [SaleController::class, 'editMonth'])->name('manual-entry.edit');
     Route::post('/manual-entry/{date}/update', [SaleController::class, 'updateMonth'])->name('manual-entry.update');
+    Route::post('/sales/update-rate', [SaleController::class, 'updateRate'])->name('sales.update-rate');
     
     // Rutas para gestionar ventas
     Route::get('/sales', [SaleController::class, 'list'])->name('sales.list');
