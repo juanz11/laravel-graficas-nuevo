@@ -277,4 +277,83 @@ class SaleControllerTest extends TestCase
         $this->assertCount(1, $client['items']);
         $this->assertEquals('PROD1', $client['items'][0]->product_code);
     }
+
+    /** @test */
+    public function test_compare_shows_differences_without_importing()
+    {
+        $user = User::factory()->create();
+
+        // Existing records in the system for June 2026
+        Sale::create([
+            'report_date' => '2026-06-01',
+            'client_code' => 'CLI001',
+            'client_name' => 'Client One',
+            'client_class' => 'A',
+            'product_code' => 'PROD_SAME',
+            'product_description' => 'Same Product',
+            'quantity' => 10,
+            'total_sales' => 100.00,
+        ]);
+        Sale::create([
+            'report_date' => '2026-06-01',
+            'client_code' => 'CLI001',
+            'client_name' => 'Client One',
+            'client_class' => 'A',
+            'product_code' => 'PROD_CHANGED',
+            'product_description' => 'Changed Product',
+            'quantity' => 5,
+            'total_sales' => 50.00,
+        ]);
+        Sale::create([
+            'report_date' => '2026-06-01',
+            'client_code' => 'CLI001',
+            'client_name' => 'Client One',
+            'client_class' => 'A',
+            'product_code' => 'PROD_ONLY_DB',
+            'product_description' => 'Only In System',
+            'quantity' => 3,
+            'total_sales' => 30.00,
+            'is_manual' => true,
+        ]);
+
+        // XLSX fixture mimicking the SNC report format for June 2026
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $spreadsheet->getActiveSheet()->fromArray([
+            ['Reporte de operaciones desde 01/06/2026 Hasta 30/06/2026'],
+            ['Datos del Cliente', 'Clase'],
+            ['CLI001', 'Client One', 'A'],
+            ['Código', 'Descripción', 'Cantidad', 'Total Ventas', 'Total Costo', 'Total Utilidad', '% Utilidad'],
+            ['PROD_SAME', 'Same Product', 10, 100.00, 80.00, 20.00, 20],
+            ['PROD_CHANGED', 'Changed Product', 8, 80.00, 64.00, 16.00, 20],
+            ['PROD_NEW', 'Brand New Product', 4, 40.00, 32.00, 8.00, 20],
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'rep') . '.xlsx';
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($path);
+
+        $response = $this->actingAs($user)->post(route('compare.run'), [
+            'report_file' => new \Illuminate\Http\UploadedFile($path, 'reporte.xlsx', null, null, true),
+        ]);
+
+        $response->assertOk();
+        $comparison = $response->viewData('comparison');
+
+        // PROD_SAME matches, PROD_CHANGED differs, PROD_NEW is new, PROD_ONLY_DB missing
+        $this->assertEquals('Junio 2026', $comparison['month_label']);
+        $this->assertEquals(1, $comparison['same_count']);
+
+        $this->assertCount(1, $comparison['new']);
+        $this->assertEquals('PROD_NEW', $comparison['new'][0]['product_code']);
+
+        $this->assertCount(1, $comparison['changed']);
+        $this->assertEquals('PROD_CHANGED', $comparison['changed'][0]['product_code']);
+        $this->assertEquals(5, $comparison['changed'][0]['old_qty']);
+        $this->assertEquals(8, $comparison['changed'][0]['new_qty']);
+
+        $this->assertCount(1, $comparison['missing']);
+        $this->assertEquals('PROD_ONLY_DB', $comparison['missing'][0]['product_code']);
+        $this->assertTrue($comparison['missing'][0]['is_manual']);
+
+        // Nothing was imported
+        $this->assertEquals(3, Sale::count());
+    }
 }

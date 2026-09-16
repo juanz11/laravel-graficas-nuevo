@@ -100,6 +100,14 @@
                         <span class="hidden sm:inline">Gestionar Ventas</span>
                     </a>
 
+                    <a href="{{ route('compare') }}" 
+                        class="text-xs font-semibold px-3 py-2 sm:px-4 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-cyan-600/20">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                        <span class="hidden sm:inline">Comparar</span>
+                    </a>
+
                     <button onclick="toggleModal('import-modal')" 
                         class="text-xs font-semibold px-3 py-2 sm:px-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-purple-600/20">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

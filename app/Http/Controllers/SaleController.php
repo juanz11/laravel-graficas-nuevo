@@ -297,172 +297,14 @@ class SaleController extends Controller
         $filePath = $file->getRealPath();
 
         try {
-            // Cargar el archivo usando PhpSpreadsheet (detecta automáticamente el formato)
-            $spreadsheet = IOFactory::load($filePath);
-            $sheet = $spreadsheet->getActiveSheet();
-            $rows = $sheet->toArray(null, true, true, true);
-
-            $reportDate = null;
-            $salesToInsert = [];
-            
-            // Mapeo inicial por defecto
-            $colMap = [
-                'code' => 'A',
-                'desc' => 'B',
-                'qty' => 'C',
-                'sales' => 'D',
-                'cost' => 'E',
-                'utility' => 'F',
-                'utility_percent' => 'G',
-            ];
-
-            $currentClientCode = null;
-            $currentClientName = null;
-            $currentClientClass = null;
-            $isNextRowClientData = false;
-
-            // 1. Primera pasada para buscar la fecha del reporte
-            foreach ($rows as $row) {
-                $rowText = implode(' ', array_filter(array_map('strval', $row)));
-                // Intentar buscar "Reporte de operaciones desde DD/MM/YYYY Hasta DD/MM/YYYY"
-                if (preg_match('/desde\s+(\d{2})\/(\d{2})\/(\d{4})\s+Hasta\s+(\d{2})\/(\d{2})\/(\d{4})/i', $rowText, $matches)) {
-                    // Usar el mes y año de la fecha de inicio del reporte
-                    $day = $matches[1];
-                    $month = $matches[2];
-                    $year = $matches[3];
-                    $reportDate = "{$year}-{$month}-01";
-                    break;
-                }
-            }
-
-            // Si no se encuentra en el formato largo, buscar cualquier patrón de fechas en filas de cabecera
-            if (!$reportDate) {
-                foreach ($rows as $row) {
-                    foreach ($row as $val) {
-                        if (is_string($val) && preg_match('/(\d{2})\/(\d{2})\/(\d{4})/', $val, $matches)) {
-                            $reportDate = "{$matches[3]}-{$matches[2]}-01";
-                            break 2;
-                        }
-                    }
-                }
-            }
-
-            // Si sigue sin fecha, asignar el primer día del mes actual
-            if (!$reportDate) {
-                $reportDate = now()->startOfMonth()->format('Y-m-d');
-            }
-
-            // 2. Segunda pasada para procesar los clientes y sus productos
-            foreach ($rows as $row) {
-                $rowText = implode(' ', array_filter(array_map('strval', $row)));
-
-                // Detectar indicador de cliente
-                if (str_contains($rowText, 'Datos del Cliente') && str_contains($rowText, 'Clase')) {
-                    $isNextRowClientData = true;
-                    continue;
-                }
-
-                if ($isNextRowClientData) {
-                    $nonEmptyCells = [];
-                    foreach ($row as $cell) {
-                        $val = trim((string)$cell);
-                        if ($val !== '') {
-                            $nonEmptyCells[] = $val;
-                        }
-                    }
-                    if (count($nonEmptyCells) >= 2) {
-                        $currentClientCode = $nonEmptyCells[0];
-                        $currentClientName = $nonEmptyCells[1];
-                        $currentClientClass = $nonEmptyCells[2] ?? 'GENERAL';
-                    }
-                    $isNextRowClientData = false;
-                    continue;
-                }
-
-                // Detectar cabecera de tabla de productos para re-mapear columnas si es necesario
-                if (str_contains($rowText, 'Código') && str_contains($rowText, 'Descripción') && str_contains($rowText, 'Cantidad')) {
-                    foreach ($row as $colLetter => $cellValue) {
-                        $val = strtolower(trim((string)$cellValue));
-                        if (str_contains($val, 'código') || str_contains($val, 'codigo')) {
-                            $colMap['code'] = $colLetter;
-                        } elseif (str_contains($val, 'descripción') || str_contains($val, 'descripcion')) {
-                            $colMap['desc'] = $colLetter;
-                        } elseif (str_contains($val, 'cantidad')) {
-                            $colMap['qty'] = $colLetter;
-                        } elseif (str_contains($val, 'total ventas') || (str_contains($val, 'total') && str_contains($val, 'venta'))) {
-                            $colMap['sales'] = $colLetter;
-                        } elseif (str_contains($val, 'total costo') || (str_contains($val, 'total') && str_contains($val, 'costo'))) {
-                            $colMap['cost'] = $colLetter;
-                        } elseif (str_contains($val, 'total utilidad') || (str_contains($val, 'total') && str_contains($val, 'utilidad'))) {
-                            $colMap['utility'] = $colLetter;
-                        } elseif (str_contains($val, '% utilidad')) {
-                            $colMap['utility_percent'] = $colLetter;
-                        }
-                    }
-                    continue;
-                }
-
-                // Si tenemos un cliente activo, procesar filas de productos
-                if ($currentClientCode !== null) {
-                    $prodCode = trim((string)($row[$colMap['code'] ?? 'A'] ?? ''));
-
-                    // Ignorar cabeceras, totales de cliente, páginas o metadatos
-                    if (empty($prodCode) || 
-                        str_contains(strtolower($prodCode), 'código') || 
-                        str_contains(strtolower($prodCode), 'codigo') || 
-                        str_contains(strtolower($prodCode), 'total') || 
-                        str_contains(strtolower($prodCode), 'datos') || 
-                        str_contains(strtolower($prodCode), 'snc pharma') || 
-                        str_contains(strtolower($prodCode), 'página') || 
-                        str_contains(strtolower($prodCode), 'pagina') || 
-                        str_contains(strtolower($prodCode), 'av.') ||
-                        str_contains(strtolower($prodCode), 'reporte') ||
-                        str_contains(strtolower($prodCode), 'clase')) {
-                        continue;
-                    }
-
-                    $prodDesc = trim((string)($row[$colMap['desc'] ?? 'B'] ?? ''));
-                    $qtyVal = $row[$colMap['qty'] ?? 'C'] ?? '0';
-                    $salesVal = $row[$colMap['sales'] ?? 'D'] ?? '0';
-                    $costVal = $row[$colMap['cost'] ?? 'E'] ?? '0';
-                    $utilityVal = $row[$colMap['utility'] ?? 'F'] ?? '0';
-                    $utilPctVal = $row[$colMap['utility_percent'] ?? 'G'] ?? '0';
-
-                    // Limpieza e interpretación de números
-                    $qty = (int) str_replace(['.', ',', ' ', '-'], '', (string)$qtyVal);
-                    // Si el valor original tenía signo negativo "--" o "-"
-                    if (str_starts_with(trim((string)$qtyVal), '--') || str_starts_with(trim((string)$qtyVal), '-')) {
-                        $qty = -$qty;
-                    }
-
-                    $totalSales = $this->cleanAmount($salesVal);
-                    $totalCost = $this->cleanAmount($costVal);
-                    $totalUtility = $this->cleanAmount($utilityVal);
-                    $utilityPct = $this->cleanAmount($utilPctVal);
-
-                    // Si el costo viene vacío, calcularlo
-                    if ($totalCost == 0.0 && $totalSales != 0.0 && $totalUtility != 0.0) {
-                        $totalCost = $totalSales - $totalUtility;
-                    }
-
-                    $salesToInsert[] = [
-                        'report_date' => $reportDate,
-                        'exchange_rate' => $exchangeRate,
-                        'client_code' => $currentClientCode,
-                        'client_name' => $currentClientName,
-                        'client_class' => $currentClientClass,
-                        'product_code' => $prodCode,
-                        'product_description' => $prodDesc,
-                        'quantity' => $qty,
-                        'total_sales' => $totalSales,
-                        'total_cost' => $totalCost,
-                        'total_utility' => $totalUtility,
-                        'utility_percentage' => $utilityPct,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
-                }
-            }
+            $parsed = $this->parseReportFile($filePath);
+            $reportDate = $parsed['report_date'];
+            $salesToInsert = array_map(function ($row) use ($exchangeRate) {
+                $row['exchange_rate'] = $exchangeRate;
+                $row['created_at'] = now();
+                $row['updated_at'] = now();
+                return $row;
+            }, $parsed['rows']);
 
             if (count($salesToInsert) > 0) {
                 // Iniciar transacción de base de datos
@@ -488,6 +330,305 @@ class SaleController extends Controller
         } catch (\Exception $e) {
             return back()->withErrors(['report_file' => 'Error al procesar el archivo: ' . $e->getMessage()]);
         }
+    }
+
+    /**
+     * Parse a sales report file (Excel/CSV/txt/html) into normalized rows.
+     * Returns ['report_date' => 'Y-m-d', 'rows' => [...]].
+     */
+    private function parseReportFile(string $filePath): array
+    {
+        // Cargar el archivo usando PhpSpreadsheet (detecta automáticamente el formato)
+        $spreadsheet = IOFactory::load($filePath);
+        $sheet = $spreadsheet->getActiveSheet();
+        $rows = $sheet->toArray(null, true, true, true);
+
+        $reportDate = null;
+        $salesToInsert = [];
+
+        // Mapeo inicial por defecto
+        $colMap = [
+            'code' => 'A',
+            'desc' => 'B',
+            'qty' => 'C',
+            'sales' => 'D',
+            'cost' => 'E',
+            'utility' => 'F',
+            'utility_percent' => 'G',
+        ];
+
+        $currentClientCode = null;
+        $currentClientName = null;
+        $currentClientClass = null;
+        $isNextRowClientData = false;
+
+        // 1. Primera pasada para buscar la fecha del reporte
+        foreach ($rows as $row) {
+            $rowText = implode(' ', array_filter(array_map('strval', $row)));
+            // Intentar buscar "Reporte de operaciones desde DD/MM/YYYY Hasta DD/MM/YYYY"
+            if (preg_match('/desde\s+(\d{2})\/(\d{2})\/(\d{4})\s+Hasta\s+(\d{2})\/(\d{2})\/(\d{4})/i', $rowText, $matches)) {
+                // Usar el mes y año de la fecha de inicio del reporte
+                $day = $matches[1];
+                $month = $matches[2];
+                $year = $matches[3];
+                $reportDate = "{$year}-{$month}-01";
+                break;
+            }
+        }
+
+        // Si no se encuentra en el formato largo, buscar cualquier patrón de fechas en filas de cabecera
+        if (!$reportDate) {
+            foreach ($rows as $row) {
+                foreach ($row as $val) {
+                    if (is_string($val) && preg_match('/(\d{2})\/(\d{2})\/(\d{4})/', $val, $matches)) {
+                        $reportDate = "{$matches[3]}-{$matches[2]}-01";
+                        break 2;
+                    }
+                }
+            }
+        }
+
+        // Si sigue sin fecha, asignar el primer día del mes actual
+        if (!$reportDate) {
+            $reportDate = now()->startOfMonth()->format('Y-m-d');
+        }
+
+        // 2. Segunda pasada para procesar los clientes y sus productos
+        foreach ($rows as $row) {
+            $rowText = implode(' ', array_filter(array_map('strval', $row)));
+
+            // Detectar indicador de cliente
+            if (str_contains($rowText, 'Datos del Cliente') && str_contains($rowText, 'Clase')) {
+                $isNextRowClientData = true;
+                continue;
+            }
+
+            if ($isNextRowClientData) {
+                $nonEmptyCells = [];
+                foreach ($row as $cell) {
+                    $val = trim((string)$cell);
+                    if ($val !== '') {
+                        $nonEmptyCells[] = $val;
+                    }
+                }
+                if (count($nonEmptyCells) >= 2) {
+                    $currentClientCode = $nonEmptyCells[0];
+                    $currentClientName = $nonEmptyCells[1];
+                    $currentClientClass = $nonEmptyCells[2] ?? 'GENERAL';
+                }
+                $isNextRowClientData = false;
+                continue;
+            }
+
+            // Detectar cabecera de tabla de productos para re-mapear columnas si es necesario
+            if (str_contains($rowText, 'Código') && str_contains($rowText, 'Descripción') && str_contains($rowText, 'Cantidad')) {
+                foreach ($row as $colLetter => $cellValue) {
+                    $val = strtolower(trim((string)$cellValue));
+                    if (str_contains($val, 'código') || str_contains($val, 'codigo')) {
+                        $colMap['code'] = $colLetter;
+                    } elseif (str_contains($val, 'descripción') || str_contains($val, 'descripcion')) {
+                        $colMap['desc'] = $colLetter;
+                    } elseif (str_contains($val, 'cantidad')) {
+                        $colMap['qty'] = $colLetter;
+                    } elseif (str_contains($val, 'total ventas') || (str_contains($val, 'total') && str_contains($val, 'venta'))) {
+                        $colMap['sales'] = $colLetter;
+                    } elseif (str_contains($val, 'total costo') || (str_contains($val, 'total') && str_contains($val, 'costo'))) {
+                        $colMap['cost'] = $colLetter;
+                    } elseif (str_contains($val, 'total utilidad') || (str_contains($val, 'total') && str_contains($val, 'utilidad'))) {
+                        $colMap['utility'] = $colLetter;
+                    } elseif (str_contains($val, '% utilidad')) {
+                        $colMap['utility_percent'] = $colLetter;
+                    }
+                }
+                continue;
+            }
+
+            // Si tenemos un cliente activo, procesar filas de productos
+            if ($currentClientCode !== null) {
+                $prodCode = trim((string)($row[$colMap['code'] ?? 'A'] ?? ''));
+
+                // Ignorar cabeceras, totales de cliente, páginas o metadatos
+                if (empty($prodCode) ||
+                    str_contains(strtolower($prodCode), 'código') ||
+                    str_contains(strtolower($prodCode), 'codigo') ||
+                    str_contains(strtolower($prodCode), 'total') ||
+                    str_contains(strtolower($prodCode), 'datos') ||
+                    str_contains(strtolower($prodCode), 'snc pharma') ||
+                    str_contains(strtolower($prodCode), 'página') ||
+                    str_contains(strtolower($prodCode), 'pagina') ||
+                    str_contains(strtolower($prodCode), 'av.') ||
+                    str_contains(strtolower($prodCode), 'reporte') ||
+                    str_contains(strtolower($prodCode), 'clase')) {
+                    continue;
+                }
+
+                $prodDesc = trim((string)($row[$colMap['desc'] ?? 'B'] ?? ''));
+                $qtyVal = $row[$colMap['qty'] ?? 'C'] ?? '0';
+                $salesVal = $row[$colMap['sales'] ?? 'D'] ?? '0';
+                $costVal = $row[$colMap['cost'] ?? 'E'] ?? '0';
+                $utilityVal = $row[$colMap['utility'] ?? 'F'] ?? '0';
+                $utilPctVal = $row[$colMap['utility_percent'] ?? 'G'] ?? '0';
+
+                // Limpieza e interpretación de números
+                $qty = (int) str_replace(['.', ',', ' ', '-'], '', (string)$qtyVal);
+                // Si el valor original tenía signo negativo "--" o "-"
+                if (str_starts_with(trim((string)$qtyVal), '--') || str_starts_with(trim((string)$qtyVal), '-')) {
+                    $qty = -$qty;
+                }
+
+                $totalSales = $this->cleanAmount($salesVal);
+                $totalCost = $this->cleanAmount($costVal);
+                $totalUtility = $this->cleanAmount($utilityVal);
+                $utilityPct = $this->cleanAmount($utilPctVal);
+
+                // Si el costo viene vacío, calcularlo
+                if ($totalCost == 0.0 && $totalSales != 0.0 && $totalUtility != 0.0) {
+                    $totalCost = $totalSales - $totalUtility;
+                }
+
+                $salesToInsert[] = [
+                    'client_code' => $currentClientCode,
+                    'client_name' => $currentClientName,
+                    'client_class' => $currentClientClass,
+                    'product_code' => $prodCode,
+                    'product_description' => $prodDesc,
+                    'quantity' => $qty,
+                    'total_sales' => $totalSales,
+                    'total_cost' => $totalCost,
+                    'total_utility' => $totalUtility,
+                    'utility_percentage' => $utilityPct,
+                ];
+            }
+        }
+
+        return ['report_date' => $reportDate, 'rows' => $salesToInsert];
+    }
+
+    /**
+     * Show the report comparison form.
+     */
+    public function showCompare()
+    {
+        return view('compare');
+    }
+
+    /**
+     * Compare an uploaded report against the stored data for its month,
+     * without importing anything.
+     */
+    public function compare(Request $request)
+    {
+        $request->validate([
+            'report_file' => 'required|file|max:10240',
+        ]);
+
+        $file = $request->file('report_file');
+        $extension = strtolower($file->getClientOriginalExtension());
+        if (!in_array($extension, ['xlsx', 'xls', 'csv', 'txt', 'html'])) {
+            return back()->withErrors(['report_file' => 'El archivo debe tener una extensión válida: xlsx, xls, csv, txt, html.']);
+        }
+
+        try {
+            $parsed = $this->parseReportFile($file->getRealPath());
+        } catch (\Exception $e) {
+            return back()->withErrors(['report_file' => 'Error al procesar el archivo: ' . $e->getMessage()]);
+        }
+
+        if (count($parsed['rows']) === 0) {
+            return back()->withErrors(['report_file' => 'No se encontraron registros de ventas procesables en el archivo. Verifica el formato.']);
+        }
+
+        $reportDate = $parsed['report_date'];
+        $carbonDate = Carbon::parse($reportDate);
+        $monthLabel = $this->getSpanishMonthName($carbonDate->month) . ' ' . $carbonDate->year;
+
+        $existing = Sale::whereDate('report_date', $reportDate)->get();
+
+        // Agrupar ambas fuentes por cliente + producto
+        $excelGroups = collect($parsed['rows'])
+            ->groupBy(fn($r) => $r['client_code'] . '|' . $r['product_code'])
+            ->map(fn($g) => [
+                'client_name' => $g[0]['client_name'],
+                'product_description' => $g[0]['product_description'],
+                'quantity' => $g->sum('quantity'),
+                'total_sales' => $g->sum('total_sales'),
+                'is_manual' => false,
+                'is_discount' => Sale::isDiscountDescription($g[0]['product_description']),
+            ]);
+
+        $dbGroups = $existing
+            ->groupBy(fn($s) => $s->client_code . '|' . $s->product_code)
+            ->map(fn($g) => [
+                'client_name' => $g->first()->client_name,
+                'product_description' => $g->first()->product_description,
+                'quantity' => $g->sum('quantity'),
+                'total_sales' => (float) $g->sum('total_sales'),
+                'is_manual' => $g->contains(fn($s) => $s->is_manual),
+                'is_discount' => $g->first()->is_discount,
+            ]);
+
+        $newInExcel = [];
+        $changed = [];
+        $sameCount = 0;
+
+        foreach ($excelGroups as $key => $excel) {
+            [$clientCode, $productCode] = explode('|', $key);
+            if (!$dbGroups->has($key)) {
+                $newInExcel[] = [
+                    'client_code' => $clientCode,
+                    'product_code' => $productCode,
+                ] + $excel;
+                continue;
+            }
+
+            $db = $dbGroups[$key];
+            if ((int) $db['quantity'] !== (int) $excel['quantity']
+                || abs($db['total_sales'] - $excel['total_sales']) > 0.01) {
+                $changed[] = [
+                    'client_code' => $clientCode,
+                    'product_code' => $productCode,
+                    'client_name' => $excel['client_name'] ?: $db['client_name'],
+                    'product_description' => $excel['product_description'] ?: $db['product_description'],
+                    'old_qty' => $db['quantity'],
+                    'new_qty' => $excel['quantity'],
+                    'old_sales' => $db['total_sales'],
+                    'new_sales' => $excel['total_sales'],
+                    'is_manual' => $db['is_manual'],
+                    'is_discount' => $excel['is_discount'] || $db['is_discount'],
+                ];
+            } else {
+                $sameCount++;
+            }
+        }
+
+        $onlyInSystem = $dbGroups->keys()->diff($excelGroups->keys())
+            ->map(function ($key) use ($dbGroups) {
+                [$clientCode, $productCode] = explode('|', $key);
+                return [
+                    'client_code' => $clientCode,
+                    'product_code' => $productCode,
+                ] + $dbGroups[$key];
+            })->values();
+
+        $excelRows = collect($parsed['rows']);
+
+        return view('compare', [
+            'comparison' => [
+                'month_label' => $monthLabel,
+                'report_date' => $reportDate,
+                'has_data' => $existing->isNotEmpty(),
+                'same_count' => $sameCount,
+                'excel_count' => $excelRows->count(),
+                'db_count' => $existing->count(),
+                'excel_units' => $excelRows->reject(fn($r) => Sale::isDiscountDescription($r['product_description']))->sum('quantity'),
+                'excel_sales' => $excelRows->sum('total_sales'),
+                'db_units' => $existing->reject(fn($s) => $s->is_discount)->sum('quantity'),
+                'db_sales' => (float) $existing->sum('total_sales'),
+                'new' => collect($newInExcel)->sortBy('client_name')->values(),
+                'changed' => collect($changed)->sortBy('client_name')->values(),
+                'missing' => $onlyInSystem->sortBy('client_name')->values(),
+            ],
+        ]);
     }
 
     /**

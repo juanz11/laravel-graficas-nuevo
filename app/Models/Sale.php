@@ -44,7 +44,15 @@ class Sale extends Model
      */
     public function getIsDiscountAttribute(): bool
     {
-        $description = strtoupper($this->product_description ?? '');
+        return self::isDiscountDescription($this->product_description);
+    }
+
+    /**
+     * Whether a product description belongs to a discount/promotional row.
+     */
+    public static function isDiscountDescription(?string $description): bool
+    {
+        $description = strtoupper($description ?? '');
         foreach (self::DISCOUNT_KEYWORDS as $keyword) {
             if (str_contains($description, $keyword)) {
                 return true;
