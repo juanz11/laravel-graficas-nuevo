@@ -308,7 +308,7 @@
                     </select>
                 </div>
                 <div class="col-span-5 sm:col-span-2">
-                    <input type="number" name="entries[${ei}][quantity]" step="1" min="0" required
+                    <input type="number" name="entries[${ei}][quantity]" step="1" required
                         class="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all"
                         placeholder="0">
                 </div>

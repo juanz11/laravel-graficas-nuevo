@@ -482,6 +482,41 @@
                     </div>
                 @endforeach
             </div>
+
+            <!-- Summary Section -->
+            <div class="glass-card rounded-2xl p-6 mt-8">
+                <h3 class="text-sm font-bold uppercase tracking-wider text-purple-400 mb-5">Resumen del período</h3>
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-5">
+                    <div>
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block mb-1">Total Unidades</span>
+                        <span class="text-xl font-extrabold text-white block">{{ number_format($summary['total_units'], 0, ',', '.') }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block mb-1">Total Ventas</span>
+                        <span class="text-xl font-extrabold text-white block">$ {{ number_format($summary['total_sales'], 2, ',', '.') }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block mb-1">Descuentos</span>
+                        <span class="text-xl font-extrabold text-red-400 block">- $ {{ number_format(abs($summary['discounts_total']), 2, ',', '.') }}</span>
+                        <span class="text-[10px] text-gray-500 block">{{ $summary['discounts_count'] }} registro(s)</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block mb-1">Unidades Negativas</span>
+                        <span class="text-xl font-extrabold text-red-400 block">{{ number_format($summary['discounts_units'], 0, ',', '.') }}</span>
+                        <span class="text-[10px] text-gray-500 block">en descuentos (no restan)</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block mb-1">Entradas Manuales</span>
+                        <span class="text-xl font-extrabold text-emerald-400 block">{{ number_format($summary['manual_count'], 0, ',', '.') }}</span>
+                        <span class="text-[10px] text-gray-500 block">registro(s)</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block mb-1">Importadas por Excel</span>
+                        <span class="text-xl font-extrabold text-indigo-400 block">{{ number_format($summary['imported_count'], 0, ',', '.') }}</span>
+                        <span class="text-[10px] text-gray-500 block">registro(s)</span>
+                    </div>
+                </div>
+            </div>
         @endif
     </main>
 
