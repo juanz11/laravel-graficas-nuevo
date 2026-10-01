@@ -279,6 +279,53 @@ class SaleControllerTest extends TestCase
     }
 
     /** @test */
+    public function test_negative_value_rows_subtract_sales_but_not_units()
+    {
+        $user = User::factory()->create();
+
+        Sale::create([
+            'report_date' => '2026-06-01',
+            'client_code' => 'CLI001',
+            'client_name' => 'Client One',
+            'client_class' => 'A',
+            'product_code' => 'PROD1',
+            'product_description' => 'Real Product',
+            'quantity' => 10,
+            'total_sales' => 100.00,
+        ]);
+
+        // Credit note row: negative quantity, amount stored positive
+        Sale::create([
+            'report_date' => '2026-06-01',
+            'client_code' => 'CLI001',
+            'client_name' => 'Client One',
+            'client_class' => 'A',
+            'product_code' => 'NC001',
+            'product_description' => 'NOTA DE CREDITO',
+            'quantity' => -3,
+            'total_sales' => 50.00,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('dashboard', ['month' => '2026-06-01']));
+
+        $response->assertStatus(200);
+
+        // Units: credit row must NOT subtract (10, not 7)
+        $kpis = $response->viewData('kpis');
+        $this->assertEquals(10, $kpis['total_quantity']);
+        // Sales: credit amount subtracts even though stored positive (100 - 50 = 50)
+        $this->assertEquals(50.00, $kpis['total_sales']);
+
+        $salesByClient = $response->viewData('salesByClient');
+        $client = collect($salesByClient)->firstWhere('code', 'CLI001');
+        $this->assertEquals(10, $client['total_qty']);
+        $this->assertEquals(50.00, $client['total_sales']);
+        // The credit row is not listed as a sold item
+        $this->assertCount(1, $client['items']);
+        $this->assertEquals('PROD1', $client['items'][0]->product_code);
+    }
+
+    /** @test */
     public function test_compare_shows_differences_without_importing()
     {
         $user = User::factory()->create();

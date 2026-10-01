@@ -80,12 +80,12 @@ class SaleController extends Controller
         $sales = $query->get();
 
         // 5. Calcular KPIs principales
-        $totalSalesUsd = $sales->sum(fn($s) => $s->total_sales / ($s->exchange_rate ?: 1));
-        $totalUtilityUsd = $sales->sum(fn($s) => $s->total_utility / ($s->exchange_rate ?: 1));
+        $totalSalesUsd = $sales->sum(fn($s) => $s->signedAmount('total_sales') / ($s->exchange_rate ?: 1));
+        $totalUtilityUsd = $sales->sum(fn($s) => $s->signedAmount('total_utility') / ($s->exchange_rate ?: 1));
 
         $kpis = [
             'total_sales' => $totalSalesUsd,
-            'total_cost' => $sales->sum(fn($s) => $s->total_cost / ($s->exchange_rate ?: 1)),
+            'total_cost' => $sales->sum(fn($s) => $s->signedAmount('total_cost') / ($s->exchange_rate ?: 1)),
             'total_utility' => $totalUtilityUsd,
             'total_quantity' => $sales->reject(fn($s) => $s->is_discount)->sum('quantity'),
             'utility_margin' => $totalSalesUsd > 0
@@ -99,7 +99,7 @@ class SaleController extends Controller
             'total_units' => $kpis['total_quantity'],
             'total_sales' => $totalSalesUsd,
             'discounts_count' => $discountRows->count(),
-            'discounts_total' => $discountRows->sum(fn($s) => $s->total_sales / ($s->exchange_rate ?: 1)),
+            'discounts_total' => $discountRows->sum(fn($s) => $s->signedAmount('total_sales') / ($s->exchange_rate ?: 1)),
             'discounts_units' => $discountRows->sum('quantity'),
             'manual_count' => $sales->filter(fn($s) => $s->is_manual)->count(),
             'imported_count' => $sales->reject(fn($s) => $s->is_manual)->count(),
@@ -111,7 +111,7 @@ class SaleController extends Controller
             $classQuery->whereDate('report_date', $selectedMonthVal);
         }
         $salesByClass = $classQuery
-            ->select('client_class', DB::raw('SUM(total_sales / COALESCE(exchange_rate, 1)) as total_sales'), DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty'))
+            ->select('client_class', DB::raw('SUM(' . Sale::signedAmountSql('total_sales') . ' / COALESCE(exchange_rate, 1)) as total_sales'), DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty'))
             ->groupBy('client_class')
             ->orderBy($viewType === 'units' ? 'total_qty' : 'total_sales', 'desc')
             ->get();
@@ -126,7 +126,7 @@ class SaleController extends Controller
                     'product_code' => $firstProd->product_code,
                     'product_description' => $firstProd->product_description,
                     'quantity' => $productSales->reject(fn($s) => $s->is_discount)->sum('quantity'),
-                    'total_sales' => $productSales->sum(fn($s) => $s->total_sales / ($s->exchange_rate ?: 1)),
+                    'total_sales' => $productSales->sum(fn($s) => $s->signedAmount('total_sales') / ($s->exchange_rate ?: 1)),
                 ];
             })->filter(fn($item) => $item->quantity > 0)
                 ->sortByDesc($viewType === 'units' ? 'quantity' : 'total_sales')->values();
@@ -135,7 +135,7 @@ class SaleController extends Controller
                 'code' => $first->client_code,
                 'name' => $first->client_name,
                 'class' => $first->client_class,
-                'total_sales' => $clientSales->sum(fn($s) => $s->total_sales / ($s->exchange_rate ?: 1)),
+                'total_sales' => $clientSales->sum(fn($s) => $s->signedAmount('total_sales') / ($s->exchange_rate ?: 1)),
                 'total_qty' => $clientSales->reject(fn($s) => $s->is_discount)->sum('quantity'),
                 'items' => $groupedItems
             ];
@@ -159,7 +159,7 @@ class SaleController extends Controller
             });
         }
         $salesByProduct = $productQuery
-            ->select('product_code', 'product_description', DB::raw('SUM(total_sales / COALESCE(exchange_rate, 1)) as total_sales'), DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty'))
+            ->select('product_code', 'product_description', DB::raw('SUM(' . Sale::signedAmountSql('total_sales') . ' / COALESCE(exchange_rate, 1)) as total_sales'), DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty'))
             ->groupBy('product_code', 'product_description')
             ->orderBy($viewType === 'units' ? 'total_qty' : 'total_sales', 'desc')
             ->limit(15)
@@ -183,7 +183,7 @@ class SaleController extends Controller
             });
         }
         $salesByProductForAvgCost = $avgCostProductQuery
-            ->select('product_code', 'product_description', DB::raw('SUM(total_sales / COALESCE(exchange_rate, 1)) as total_sales'), DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty'))
+            ->select('product_code', 'product_description', DB::raw('SUM(' . Sale::signedAmountSql('total_sales') . ' / COALESCE(exchange_rate, 1)) as total_sales'), DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty'))
             ->groupBy('product_code', 'product_description')
             ->having(DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ')'), '>', 0)
             ->orderBy('total_qty', 'desc')
@@ -196,7 +196,7 @@ class SaleController extends Controller
 
         $trendQuery = Sale::select(
             DB::raw("$monthDateFormat as month_date"),
-            DB::raw("SUM(total_sales / COALESCE(exchange_rate, 1)) as total_sales"),
+            DB::raw('SUM(' . Sale::signedAmountSql('total_sales') . ' / COALESCE(exchange_rate, 1)) as total_sales'),
             DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty')
         );
         if ($selectedClient) {
@@ -553,7 +553,7 @@ class SaleController extends Controller
                 'quantity' => $g->sum('quantity'),
                 'total_sales' => $g->sum('total_sales'),
                 'is_manual' => false,
-                'is_discount' => Sale::isDiscountDescription($g[0]['product_description']),
+                'is_discount' => Sale::isDiscountRow($g[0]['product_description'], $g->sum('quantity'), $g->sum('total_sales')),
             ]);
 
         $dbGroups = $existing
@@ -620,7 +620,7 @@ class SaleController extends Controller
                 'same_count' => $sameCount,
                 'excel_count' => $excelRows->count(),
                 'db_count' => $existing->count(),
-                'excel_units' => $excelRows->reject(fn($r) => Sale::isDiscountDescription($r['product_description']))->sum('quantity'),
+                'excel_units' => $excelRows->reject(fn($r) => Sale::isDiscountRow($r['product_description'], $r['quantity'], $r['total_sales']))->sum('quantity'),
                 'excel_sales' => $excelRows->sum('total_sales'),
                 'db_units' => $existing->reject(fn($s) => $s->is_discount)->sum('quantity'),
                 'db_sales' => (float) $existing->sum('total_sales'),
