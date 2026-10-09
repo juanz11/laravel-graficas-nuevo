@@ -1305,6 +1305,65 @@ class SaleController extends Controller
     }
 
     /**
+     * List unique clients (grouped from sales) for the client management module.
+     */
+    public function clientsIndex(Request $request)
+    {
+        $search = $request->input('search');
+
+        $query = Sale::query();
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('client_code', 'like', '%' . $search . '%')
+                  ->orWhere('client_name', 'like', '%' . $search . '%')
+                  ->orWhere('client_class', 'like', '%' . $search . '%');
+            });
+        }
+
+        $clients = $query->select(
+                'client_code',
+                'client_name',
+                'client_class',
+                DB::raw('COUNT(*) as records'),
+                DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty'),
+                DB::raw('SUM(' . Sale::signedAmountSql('total_sales') . ' / COALESCE(NULLIF(exchange_rate, 0), 1)) as total_sales')
+            )
+            ->groupBy('client_code', 'client_name', 'client_class')
+            ->orderBy('client_name')
+            ->paginate(50)
+            ->withQueryString();
+
+        // Clases existentes para autocompletar en el formulario de edición
+        $classesList = Sale::whereNotNull('client_class')
+            ->where('client_class', '!=', '')
+            ->select('client_class')->distinct()->orderBy('client_class')
+            ->pluck('client_class');
+
+        return view('clients', compact('clients', 'search', 'classesList'));
+    }
+
+    /**
+     * Update client info (code, name, class) across ALL their sale records.
+     */
+    public function updateClient(Request $request)
+    {
+        $request->validate([
+            'original_code' => 'required|string',
+            'client_code'   => 'required|string|max:255',
+            'client_name'   => 'required|string|max:255',
+            'client_class'  => 'nullable|string|max:255',
+        ]);
+
+        $updated = Sale::where('client_code', $request->original_code)->update([
+            'client_code'  => $request->client_code,
+            'client_name'  => $request->client_name,
+            'client_class' => $request->client_class ?: null,
+        ]);
+
+        return back()->with('success', "Cliente actualizado en {$updated} registro(s) de venta.");
+    }
+
+    /**
      * Get sale details in JSON format.
      */
     public function editJson($id)

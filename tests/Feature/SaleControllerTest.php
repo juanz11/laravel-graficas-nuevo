@@ -478,6 +478,64 @@ class SaleControllerTest extends TestCase
     }
 
     /** @test */
+    public function test_it_updates_client_info_across_all_their_sales()
+    {
+        $user = User::factory()->create();
+
+        Sale::create([
+            'report_date' => '2026-06-01',
+            'client_code' => 'CLI001',
+            'client_name' => 'Old Name',
+            'client_class' => 'A',
+            'product_code' => 'PROD1',
+            'product_description' => 'Product',
+            'quantity' => 10,
+            'total_sales' => 100.00,
+        ]);
+        Sale::create([
+            'report_date' => '2026-07-01',
+            'client_code' => 'CLI001',
+            'client_name' => 'Old Name',
+            'client_class' => 'A',
+            'product_code' => 'PROD2',
+            'product_description' => 'Product 2',
+            'quantity' => 5,
+            'total_sales' => 50.00,
+        ]);
+        Sale::create([
+            'report_date' => '2026-06-01',
+            'client_code' => 'CLI002',
+            'client_name' => 'Other Client',
+            'client_class' => 'C',
+            'product_code' => 'PROD1',
+            'product_description' => 'Product',
+            'quantity' => 3,
+            'total_sales' => 30.00,
+        ]);
+
+        // The clients list loads
+        $response = $this->actingAs($user)->get(route('clients.index'));
+        $response->assertStatus(200);
+
+        // Edit CLI001 => all its sales get the new name/class
+        $response = $this->actingAs($user)->post(route('clients.update'), [
+            'original_code' => 'CLI001',
+            'client_code' => 'CLI001',
+            'client_name' => 'New Name',
+            'client_class' => 'B',
+        ]);
+        $response->assertRedirect();
+
+        $this->assertEquals(2, Sale::where('client_code', 'CLI001')
+            ->where('client_name', 'New Name')->where('client_class', 'B')->count());
+
+        // Other clients untouched
+        $other = Sale::where('client_code', 'CLI002')->first();
+        $this->assertEquals('Other Client', $other->client_name);
+        $this->assertEquals('C', $other->client_class);
+    }
+
+    /** @test */
     public function test_compare_shows_differences_without_importing()
     {
         $user = User::factory()->create();
