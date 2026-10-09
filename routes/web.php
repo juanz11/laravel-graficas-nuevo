@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth')->group(function () {
     Route::get('/', [SaleController::class, 'index'])->name('dashboard');
     Route::post('/sales/import', [SaleController::class, 'import'])->name('sales.import');
+    Route::post('/sales/import-simple', [SaleController::class, 'importSimple'])->name('sales.import-simple');
     Route::get('/compare', [SaleController::class, 'showCompare'])->name('compare');
     Route::post('/compare', [SaleController::class, 'compare'])->name('compare.run');
     Route::get('/manual-entry', [SaleController::class, 'showManualEntry'])->name('manual-entry');

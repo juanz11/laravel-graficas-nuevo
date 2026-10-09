@@ -186,7 +186,7 @@
                                 </td>
                                 <td class="px-6 py-3.5 text-right text-emerald-400 font-semibold whitespace-nowrap">
                                     Bs. {{ number_format($sale->total_sales, 2, ',', '.') }}
-                                    <span class="block text-[9px] text-gray-400 font-normal">(${{ number_format($sale->total_sales / ($sale->exchange_rate ?: 1), 2, ',', '.') }})</span>
+                                    <span class="block text-[9px] text-gray-400 font-normal">(${{ number_format($sale->total_sales / ((float) $sale->exchange_rate ?: 1), 2, ',', '.') }})</span>
                                 </td>
                                 <td class="px-6 py-3.5 text-right text-red-400 whitespace-nowrap">
                                     Bs. {{ number_format($sale->total_cost, 2, ',', '.') }}

@@ -30,23 +30,39 @@ class SaleController extends Controller
             ];
         });
 
-        // 2. Determinar el mes seleccionado
+        // 2. Determinar el mes/año seleccionado
         $selectedMonthVal = null;
-        if ($request->has('month')) {
-            $selectedMonthVal = $request->input('month'); // puede ser "" para "Todos los meses"
-        } else {
-            // Por defecto en la primera carga, mostramos el último mes disponible
-            if ($availableDates->isNotEmpty()) {
-                $selectedMonthVal = $availableDates->first()->format('Y-m-d');
+        $selectedYearOnly = null;
+
+        if ($request->hasAny(['filter_month', 'filter_year'])) {
+            // Filtro Mes + Año: ambos => mes exacto, solo año => año completo,
+            // ambos vacíos => todos los meses
+            $filterMonthNum = (int) $request->input('filter_month');
+            $filterYearNum = (int) $request->input('filter_year');
+            if ($filterYearNum && $filterMonthNum >= 1 && $filterMonthNum <= 12) {
+                $selectedMonthVal = sprintf('%04d-%02d-01', $filterYearNum, $filterMonthNum);
+            } elseif ($filterYearNum) {
+                $selectedYearOnly = $filterYearNum;
             }
+        } elseif ($request->has('month')) {
+            $selectedMonthVal = $request->input('month'); // puede ser "" para "Todos los meses"
+        } elseif ($availableDates->isNotEmpty()) {
+            // Por defecto en la primera carga, mostramos el último mes disponible
+            $selectedMonthVal = $availableDates->first()->format('Y-m-d');
         }
 
         if ($selectedMonthVal) {
             $selectedMonth = Carbon::parse($selectedMonthVal);
             $selectedMonthLabel = $this->getSpanishMonthName($selectedMonth->month) . ' ' . $selectedMonth->year;
+        } elseif ($selectedYearOnly) {
+            $selectedMonthLabel = 'Año ' . $selectedYearOnly;
         } else {
             $selectedMonthLabel = 'Todos los meses';
         }
+
+        // Para repoblar los inputs del filtro
+        $filterMonth = $selectedMonthVal ? (int) Carbon::parse($selectedMonthVal)->month : null;
+        $filterYear = $selectedMonthVal ? (int) Carbon::parse($selectedMonthVal)->year : $selectedYearOnly;
 
         // 3. Obtener filtros
         $selectedClient = $request->input('client');
@@ -56,9 +72,7 @@ class SaleController extends Controller
 
         // 4. Consultar los datos filtrados por mes y filtros adicionales
         $query = Sale::query();
-        if ($selectedMonthVal) {
-            $query->whereDate('report_date', $selectedMonthVal);
-        }
+        $this->applyPeriodFilter($query, $selectedMonthVal, $selectedYearOnly);
 
         if ($selectedClient) {
             $query->where('client_code', $selectedClient);
@@ -80,12 +94,12 @@ class SaleController extends Controller
         $sales = $query->get();
 
         // 5. Calcular KPIs principales
-        $totalSalesUsd = $sales->sum(fn($s) => $s->signedAmount('total_sales') / ($s->exchange_rate ?: 1));
-        $totalUtilityUsd = $sales->sum(fn($s) => $s->signedAmount('total_utility') / ($s->exchange_rate ?: 1));
+        $totalSalesUsd = $sales->sum(fn($s) => $s->signedAmount('total_sales') / ((float) $s->exchange_rate ?: 1));
+        $totalUtilityUsd = $sales->sum(fn($s) => $s->signedAmount('total_utility') / ((float) $s->exchange_rate ?: 1));
 
         $kpis = [
             'total_sales' => $totalSalesUsd,
-            'total_cost' => $sales->sum(fn($s) => $s->signedAmount('total_cost') / ($s->exchange_rate ?: 1)),
+            'total_cost' => $sales->sum(fn($s) => $s->signedAmount('total_cost') / ((float) $s->exchange_rate ?: 1)),
             'total_utility' => $totalUtilityUsd,
             'total_quantity' => $sales->reject(fn($s) => $s->is_discount)->sum('quantity'),
             'utility_margin' => $totalSalesUsd > 0
@@ -99,7 +113,7 @@ class SaleController extends Controller
             'total_units' => $kpis['total_quantity'],
             'total_sales' => $totalSalesUsd,
             'discounts_count' => $discountRows->count(),
-            'discounts_total' => $discountRows->sum(fn($s) => $s->signedAmount('total_sales') / ($s->exchange_rate ?: 1)),
+            'discounts_total' => $discountRows->sum(fn($s) => $s->signedAmount('total_sales') / ((float) $s->exchange_rate ?: 1)),
             'discounts_units' => $discountRows->sum('quantity'),
             'manual_count' => $sales->filter(fn($s) => $s->is_manual)->count(),
             'imported_count' => $sales->reject(fn($s) => $s->is_manual)->count(),
@@ -107,11 +121,9 @@ class SaleController extends Controller
 
         // 6. Agrupar ventas por Clase de cliente (sin filtros de cliente/producto para mostrar distribución general)
         $classQuery = Sale::query();
-        if ($selectedMonthVal) {
-            $classQuery->whereDate('report_date', $selectedMonthVal);
-        }
+        $this->applyPeriodFilter($classQuery, $selectedMonthVal, $selectedYearOnly);
         $salesByClass = $classQuery
-            ->select('client_class', DB::raw('SUM(' . Sale::signedAmountSql('total_sales') . ' / COALESCE(exchange_rate, 1)) as total_sales'), DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty'))
+            ->select('client_class', DB::raw('SUM(' . Sale::signedAmountSql('total_sales') . ' / COALESCE(NULLIF(exchange_rate, 0), 1)) as total_sales'), DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty'))
             ->groupBy('client_class')
             ->orderBy($viewType === 'units' ? 'total_qty' : 'total_sales', 'desc')
             ->get();
@@ -126,7 +138,7 @@ class SaleController extends Controller
                     'product_code' => $firstProd->product_code,
                     'product_description' => $firstProd->product_description,
                     'quantity' => $productSales->reject(fn($s) => $s->is_discount)->sum('quantity'),
-                    'total_sales' => $productSales->sum(fn($s) => $s->signedAmount('total_sales') / ($s->exchange_rate ?: 1)),
+                    'total_sales' => $productSales->sum(fn($s) => $s->signedAmount('total_sales') / ((float) $s->exchange_rate ?: 1)),
                 ];
             })->filter(fn($item) => $item->quantity > 0)
                 ->sortByDesc($viewType === 'units' ? 'quantity' : 'total_sales')->values();
@@ -135,7 +147,7 @@ class SaleController extends Controller
                 'code' => $first->client_code,
                 'name' => $first->client_name,
                 'class' => $first->client_class,
-                'total_sales' => $clientSales->sum(fn($s) => $s->signedAmount('total_sales') / ($s->exchange_rate ?: 1)),
+                'total_sales' => $clientSales->sum(fn($s) => $s->signedAmount('total_sales') / ((float) $s->exchange_rate ?: 1)),
                 'total_qty' => $clientSales->reject(fn($s) => $s->is_discount)->sum('quantity'),
                 'items' => $groupedItems
             ];
@@ -143,9 +155,7 @@ class SaleController extends Controller
 
         // 8. Agrupar ventas por Producto (para gráfica de productos top, respetando filtros de cliente, clase y producto si existen)
         $productQuery = Sale::query();
-        if ($selectedMonthVal) {
-            $productQuery->whereDate('report_date', $selectedMonthVal);
-        }
+        $this->applyPeriodFilter($productQuery, $selectedMonthVal, $selectedYearOnly);
         if ($selectedClient) {
             $productQuery->where('client_code', $selectedClient);
         }
@@ -159,7 +169,7 @@ class SaleController extends Controller
             });
         }
         $salesByProduct = $productQuery
-            ->select('product_code', 'product_description', DB::raw('SUM(' . Sale::signedAmountSql('total_sales') . ' / COALESCE(exchange_rate, 1)) as total_sales'), DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty'))
+            ->select('product_code', 'product_description', DB::raw('SUM(' . Sale::signedAmountSql('total_sales') . ' / COALESCE(NULLIF(exchange_rate, 0), 1)) as total_sales'), DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty'))
             ->groupBy('product_code', 'product_description')
             ->orderBy($viewType === 'units' ? 'total_qty' : 'total_sales', 'desc')
             ->limit(15)
@@ -167,9 +177,7 @@ class SaleController extends Controller
 
         // Separate query for Costo Promedio chart — always ordered by total_sales, independent of viewType
         $avgCostProductQuery = Sale::query();
-        if ($selectedMonthVal) {
-            $avgCostProductQuery->whereDate('report_date', $selectedMonthVal);
-        }
+        $this->applyPeriodFilter($avgCostProductQuery, $selectedMonthVal, $selectedYearOnly);
         if ($selectedClient) {
             $avgCostProductQuery->where('client_code', $selectedClient);
         }
@@ -183,7 +191,7 @@ class SaleController extends Controller
             });
         }
         $salesByProductForAvgCost = $avgCostProductQuery
-            ->select('product_code', 'product_description', DB::raw('SUM(' . Sale::signedAmountSql('total_sales') . ' / COALESCE(exchange_rate, 1)) as total_sales'), DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty'))
+            ->select('product_code', 'product_description', DB::raw('SUM(' . Sale::signedAmountSql('total_sales') . ' / COALESCE(NULLIF(exchange_rate, 0), 1)) as total_sales'), DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty'))
             ->groupBy('product_code', 'product_description')
             ->having(DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ')'), '>', 0)
             ->orderBy('total_qty', 'desc')
@@ -196,9 +204,10 @@ class SaleController extends Controller
 
         $trendQuery = Sale::select(
             DB::raw("$monthDateFormat as month_date"),
-            DB::raw('SUM(' . Sale::signedAmountSql('total_sales') . ' / COALESCE(exchange_rate, 1)) as total_sales'),
+            DB::raw('SUM(' . Sale::signedAmountSql('total_sales') . ' / COALESCE(NULLIF(exchange_rate, 0), 1)) as total_sales'),
             DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty')
         );
+        $this->applyPeriodFilter($trendQuery, $selectedMonthVal, $selectedYearOnly);
         if ($selectedClient) {
             $trendQuery->where('client_code', $selectedClient);
         }
@@ -223,11 +232,87 @@ class SaleController extends Controller
                 ];
             });
 
+        // 9b. Comparación anual: año del filtro actual (o el más reciente) vs otro año
+        $yearExpr = DB::connection()->getDriverName() === 'sqlite'
+            ? "CAST(strftime('%Y', report_date) AS INTEGER)"
+            : "YEAR(report_date)";
+        $monthNumExpr = DB::connection()->getDriverName() === 'sqlite'
+            ? "CAST(strftime('%m', report_date) AS INTEGER)"
+            : "MONTH(report_date)";
+
+        $availableYears = $availableDates
+            ->map(fn($d) => Carbon::parse($d)->year)
+            ->unique()->sortDesc()->values();
+
+        $yearA = $selectedYearOnly
+            ?? ($selectedMonthVal ? Carbon::parse($selectedMonthVal)->year : null)
+            ?? $availableYears->first();
+
+        $compareYearInput = (int) $request->input('compare_year');
+        $yearB = ($compareYearInput && $compareYearInput !== $yearA)
+            ? $compareYearInput
+            : ($yearA ? $yearA - 1 : null);
+
+        $yearComparison = null;
+        if ($yearA && $yearB) {
+            $yearQuery = Sale::select(
+                DB::raw("$yearExpr as y"),
+                DB::raw("$monthNumExpr as m"),
+                DB::raw('SUM(' . Sale::signedAmountSql('total_sales') . ' / COALESCE(NULLIF(exchange_rate, 0), 1)) as total_sales'),
+                DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty')
+            )->whereRaw("$yearExpr IN (?, ?)", [$yearA, $yearB]);
+
+            // Respeta los filtros de cliente, clase y producto
+            if ($selectedClient) {
+                $yearQuery->where('client_code', $selectedClient);
+            }
+            if ($selectedClass) {
+                $yearQuery->where('client_class', $selectedClass);
+            }
+            if ($selectedProduct) {
+                $yearQuery->where(function ($q) use ($selectedProduct) {
+                    $q->where('product_code', 'like', '%' . $selectedProduct . '%')
+                      ->orWhere('product_description', 'like', '%' . $selectedProduct . '%');
+                });
+            }
+
+            $byMonth = $yearQuery->groupBy('y', 'm')->get()
+                ->keyBy(fn($r) => (int) $r->y . '-' . (int) $r->m);
+
+            $series = [];
+            foreach (['a' => $yearA, 'b' => $yearB] as $key => $y) {
+                $series[$key] = ['units' => [], 'sales' => []];
+                for ($m = 1; $m <= 12; $m++) {
+                    $row = $byMonth->get("$y-$m");
+                    $series[$key]['units'][] = (float) ($row->total_qty ?? 0);
+                    $series[$key]['sales'][] = round((float) ($row->total_sales ?? 0), 2);
+                }
+            }
+
+            $totAUnits = array_sum($series['a']['units']);
+            $totBUnits = array_sum($series['b']['units']);
+            $totASales = array_sum($series['a']['sales']);
+            $totBSales = array_sum($series['b']['sales']);
+
+            $yearComparison = [
+                'year_a' => $yearA,
+                'year_b' => $yearB,
+                'a' => $series['a'],
+                'b' => $series['b'],
+                'totals' => [
+                    'a_units' => $totAUnits,
+                    'b_units' => $totBUnits,
+                    'a_sales' => $totASales,
+                    'b_sales' => $totBSales,
+                    'delta_units' => $totBUnits != 0 ? (($totAUnits - $totBUnits) / $totBUnits) * 100 : null,
+                    'delta_sales' => $totBSales != 0 ? (($totASales - $totBSales) / $totBSales) * 100 : null,
+                ],
+            ];
+        }
+
         // 10. Obtener lista de clientes para el filtro (respetando la clase seleccionada si existe)
         $clientsQuery = Sale::query();
-        if ($selectedMonthVal) {
-            $clientsQuery->whereDate('report_date', $selectedMonthVal);
-        }
+        $this->applyPeriodFilter($clientsQuery, $selectedMonthVal, $selectedYearOnly);
         if ($selectedClass) {
             $clientsQuery->where('client_class', $selectedClass);
         }
@@ -244,9 +329,7 @@ class SaleController extends Controller
 
         // 11. Obtener lista de clases únicas para el selector de filtros
         $classesQuery = Sale::query();
-        if ($selectedMonthVal) {
-            $classesQuery->whereDate('report_date', $selectedMonthVal);
-        }
+        $this->applyPeriodFilter($classesQuery, $selectedMonthVal, $selectedYearOnly);
         $classesList = $classesQuery
             ->whereNotNull('client_class')
             ->where('client_class', '!=', '')
@@ -258,6 +341,9 @@ class SaleController extends Controller
         return view('dashboard', [
             'months' => $months,
             'selectedMonthVal' => $selectedMonthVal,
+            'selectedYearOnly' => $selectedYearOnly,
+            'filterMonth' => $filterMonth,
+            'filterYear' => $filterYear,
             'selectedMonthLabel' => $selectedMonthLabel,
             'selectedClient' => $selectedClient,
             'selectedClass' => $selectedClass,
@@ -269,11 +355,25 @@ class SaleController extends Controller
             'salesByProduct' => $salesByProduct,
             'salesByProductForAvgCost' => $salesByProductForAvgCost,
             'monthlyTrend' => $monthlyTrend,
+            'availableYears' => $availableYears,
+            'yearComparison' => $yearComparison,
             'clientsList' => $clientsList,
             'classesList' => $classesList,
             'summary' => $summary,
             'hasData' => $sales->isNotEmpty(),
         ]);
+    }
+
+    /**
+     * Apply the period filter to a query: exact month, whole year, or none.
+     */
+    private function applyPeriodFilter($query, ?string $monthVal, ?int $year): void
+    {
+        if ($monthVal) {
+            $query->whereDate('report_date', $monthVal);
+        } elseif ($year) {
+            $query->whereYear('report_date', $year);
+        }
     }
 
     /**
@@ -502,6 +602,174 @@ class SaleController extends Controller
         }
 
         return ['report_date' => $reportDate, 'rows' => $salesToInsert];
+    }
+
+    /**
+     * Handle the upload and import of the improvised sales report
+     * (Código, Productos, Clase Terapéutica, Cliente, Clase, Mes, Año,
+     * Unidades, Valores, Tasa Valor USD).
+     *
+     * Rows are flagged with is_improvised so re-importing only replaces
+     * improvised data and never touches the regular report data.
+     */
+    public function importSimple(Request $request)
+    {
+        $request->validate([
+            'report_file' => 'required|file|max:10240',
+        ]);
+
+        $file = $request->file('report_file');
+        $extension = strtolower($file->getClientOriginalExtension());
+        if (!in_array($extension, ['xlsx', 'xls', 'csv', 'txt', 'html'])) {
+            return back()->withErrors(['report_file' => 'El archivo debe tener una extensión válida: xlsx, xls, csv, txt, html.']);
+        }
+
+        try {
+            $rows = $this->parseSimpleReportFile($file->getRealPath());
+        } catch (\Exception $e) {
+            return back()->withErrors(['report_file' => 'Error al procesar el archivo: ' . $e->getMessage()]);
+        }
+
+        if (count($rows) === 0) {
+            return back()->withErrors(['report_file' => 'No se encontraron registros de ventas procesables en el archivo. Verifica el formato.']);
+        }
+
+        $reportDates = array_values(array_unique(array_column($rows, 'report_date')));
+
+        DB::transaction(function () use ($reportDates, $rows) {
+            // Solo reemplaza filas improvisadas de los meses incluidos;
+            // la data importada con el otro formato no se toca.
+            Sale::whereIn('report_date', $reportDates)
+                ->where('is_improvised', true)
+                ->delete();
+
+            foreach (array_chunk($rows, 500) as $chunk) {
+                Sale::insert($chunk);
+            }
+        });
+
+        $monthLabels = collect($reportDates)
+            ->map(fn($d) => $this->getSpanishMonthName(Carbon::parse($d)->month) . ' ' . Carbon::parse($d)->year)
+            ->implode(', ');
+
+        return back()->with('success', "Se importaron correctamente " . count($rows) . " registros improvisados ({$monthLabels}).");
+    }
+
+    /**
+     * Parse the improvised report file into normalized sale rows.
+     * Columns are mapped by header name; each row carries its own
+     * Mes/Año so the file may span multiple months.
+     */
+    private function parseSimpleReportFile(string $filePath): array
+    {
+        $spreadsheet = IOFactory::load($filePath);
+        $sheet = $spreadsheet->getActiveSheet();
+        $rows = $sheet->toArray(null, true, true, true);
+
+        $colMap = null;
+        $salesToInsert = [];
+
+        foreach ($rows as $row) {
+            // 1. Detectar la fila de cabecera y mapear columnas por nombre
+            if ($colMap === null) {
+                $map = [];
+                foreach ($row as $colLetter => $cellValue) {
+                    $val = mb_strtolower(trim((string)$cellValue));
+                    if (str_contains($val, 'código') || str_contains($val, 'codigo')) {
+                        $map['code'] = $colLetter;
+                    } elseif (str_contains($val, 'producto')) {
+                        $map['desc'] = $colLetter;
+                    } elseif (str_contains($val, 'cliente')) {
+                        $map['client'] = $colLetter;
+                    } elseif (str_contains($val, 'clase') && !str_contains($val, 'terap')) {
+                        $map['class'] = $colLetter;
+                    } elseif (str_contains($val, 'tasa') || str_contains($val, 'usd')) {
+                        $map['rate'] = $colLetter;
+                    } elseif (str_contains($val, 'valor')) {
+                        $map['sales'] = $colLetter;
+                    } elseif (str_contains($val, 'unidad')) {
+                        $map['qty'] = $colLetter;
+                    } elseif (str_contains($val, 'mes')) {
+                        $map['month'] = $colLetter;
+                    } elseif (str_contains($val, 'año') || str_contains($val, 'ano')) {
+                        $map['year'] = $colLetter;
+                    }
+                }
+                if (isset($map['code'], $map['qty'], $map['sales'], $map['year'])) {
+                    $colMap = $map;
+                }
+                continue;
+            }
+
+            // 2. Procesar filas de datos
+            $prodCode = trim((string)($row[$colMap['code']] ?? ''));
+            if ($prodCode === '' ||
+                str_contains(strtolower($prodCode), 'código') ||
+                str_contains(strtolower($prodCode), 'codigo') ||
+                str_contains(strtolower($prodCode), 'total')) {
+                continue;
+            }
+
+            $clientName = trim((string)($row[$colMap['client'] ?? null] ?? ''));
+            $clientClass = trim((string)($row[$colMap['class'] ?? null] ?? '')) ?: 'GENERAL';
+            $year = (int) $this->cleanAmount($row[$colMap['year'] ?? null] ?? 0);
+            $month = $this->parseMonthValue($row[$colMap['month'] ?? null] ?? '');
+            if ($year < 1990 || $year > 2100) {
+                continue;
+            }
+
+            $qty = (int) round($this->cleanAmount($row[$colMap['qty']] ?? 0));
+            $totalSales = $this->cleanAmount($row[$colMap['sales']] ?? 0);
+            $rate = $this->cleanAmount($row[$colMap['rate'] ?? null] ?? 0);
+
+            $salesToInsert[] = [
+                'report_date' => sprintf('%04d-%02d-01', $year, $month),
+                'exchange_rate' => $rate > 0 ? $rate : 0,
+                'client_code' => $clientName !== '' ? $clientName : 'SIN-CLIENTE',
+                'client_name' => $clientName !== '' ? $clientName : 'SIN-CLIENTE',
+                'client_class' => $clientClass,
+                'product_code' => $prodCode,
+                'product_description' => trim((string)($row[$colMap['desc'] ?? null] ?? '')),
+                'quantity' => $qty,
+                'total_sales' => $totalSales,
+                'total_cost' => 0,
+                'total_utility' => 0,
+                'utility_percentage' => 0,
+                'is_improvised' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        }
+
+        return $salesToInsert;
+    }
+
+    /**
+     * Interpret the "Mes" cell of the improvised report: month number
+     * (1-12), month name in Spanish, or 1 as fallback.
+     */
+    private function parseMonthValue($val): int
+    {
+        $val = trim((string)$val);
+        if (is_numeric($val)) {
+            $n = (int) $val;
+            return ($n >= 1 && $n <= 12) ? $n : 1;
+        }
+
+        $names = [
+            'enero' => 1, 'febrero' => 2, 'marzo' => 3, 'abril' => 4,
+            'mayo' => 5, 'junio' => 6, 'julio' => 7, 'agosto' => 8,
+            'septiembre' => 9, 'setiembre' => 9, 'octubre' => 10,
+            'noviembre' => 11, 'diciembre' => 12,
+        ];
+        $lower = mb_strtolower($val);
+        foreach ($names as $name => $num) {
+            if (str_starts_with($lower, substr($name, 0, 3))) {
+                return $num;
+            }
+        }
+
+        return 1;
     }
 
     /**

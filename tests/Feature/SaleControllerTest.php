@@ -326,6 +326,158 @@ class SaleControllerTest extends TestCase
     }
 
     /** @test */
+    public function test_simple_import_adds_rows_without_touching_existing_data()
+    {
+        $user = User::factory()->create();
+
+        // Existing regular data for June 2026 must survive the improvised import
+        Sale::create([
+            'report_date' => '2026-06-01',
+            'exchange_rate' => 40.00,
+            'client_code' => 'CLI001',
+            'client_name' => 'Client One',
+            'client_class' => 'A',
+            'product_code' => 'PROD1',
+            'product_description' => 'Real Product',
+            'quantity' => 10,
+            'total_sales' => 100.00,
+        ]);
+
+        // XLSX fixture in the improvised format
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $spreadsheet->getActiveSheet()->fromArray([
+            ['Código', 'Productos', 'Clase Terapéutica', 'Cliente', 'Clase', 'Mes', 'Año', 'Unidades', 'Valores', 'Tasa Valor USD'],
+            ['7595368000050', 'MEZIHITIN 10 MG X 50 COMP.', 'DROGAS ANTI-DEMENCIA', 'FARMATODO, C.A.', 'FARMATODO', 6, 2026, 13592, 50735.16, null],
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'rep') . '.xlsx';
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($path);
+
+        $response = $this->actingAs($user)->post(route('sales.import-simple'), [
+            'report_file' => new \Illuminate\Http\UploadedFile($path, 'simple.xlsx', null, null, true),
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        // The regular row is untouched
+        $regular = Sale::where('product_code', 'PROD1')->first();
+        $this->assertNotNull($regular);
+        $this->assertEquals(10, $regular->quantity);
+        $this->assertFalse((bool) $regular->is_improvised);
+
+        // The improvised row was imported with rate 0 and correct month
+        $imported = Sale::where('product_code', '7595368000050')->first();
+        $this->assertNotNull($imported);
+        $this->assertTrue((bool) $imported->is_improvised);
+        $this->assertEquals('2026-06-01', $imported->report_date->format('Y-m-d'));
+        $this->assertEquals(13592, $imported->quantity);
+        $this->assertEquals(50735.16, (float) $imported->total_sales);
+        $this->assertEquals(0.0, (float) $imported->exchange_rate);
+        $this->assertEquals('FARMATODO, C.A.', $imported->client_name);
+        $this->assertEquals('FARMATODO', $imported->client_class);
+
+        // The dashboard shows both sets of units without dividing by zero
+        $response = $this->actingAs($user)->get(route('dashboard', ['month' => '2026-06-01']));
+        $response->assertStatus(200);
+        $kpis = $response->viewData('kpis');
+        $this->assertEquals(13602, $kpis['total_quantity']);
+    }
+
+    /** @test */
+    public function test_it_filters_by_month_and_year_inputs()
+    {
+        $user = User::factory()->create();
+
+        Sale::create([
+            'report_date' => '2026-06-01',
+            'client_code' => 'CLI001',
+            'client_name' => 'Client One',
+            'client_class' => 'A',
+            'product_code' => 'PROD_JUN',
+            'product_description' => 'June Product',
+            'quantity' => 10,
+            'total_sales' => 100.00,
+        ]);
+
+        Sale::create([
+            'report_date' => '2026-07-01',
+            'client_code' => 'CLI001',
+            'client_name' => 'Client One',
+            'client_class' => 'A',
+            'product_code' => 'PROD_JUL',
+            'product_description' => 'July Product',
+            'quantity' => 20,
+            'total_sales' => 200.00,
+        ]);
+
+        // Month + year => exact month
+        $response = $this->actingAs($user)->get(route('dashboard', ['filter_month' => 6, 'filter_year' => 2026]));
+        $response->assertStatus(200);
+        $this->assertEquals(10, $response->viewData('kpis')['total_quantity']);
+        $this->assertEquals('2026-06-01', $response->viewData('selectedMonthVal'));
+
+        // Year only => whole year
+        $response = $this->actingAs($user)->get(route('dashboard', ['filter_year' => 2026]));
+        $response->assertStatus(200);
+        $this->assertEquals(30, $response->viewData('kpis')['total_quantity']);
+        $this->assertEquals(2026, $response->viewData('selectedYearOnly'));
+        $this->assertEquals('Año 2026', $response->viewData('selectedMonthLabel'));
+
+        // Both empty => all months
+        $response = $this->actingAs($user)->get(route('dashboard', ['filter_month' => '', 'filter_year' => '']));
+        $response->assertStatus(200);
+        $this->assertEquals(30, $response->viewData('kpis')['total_quantity']);
+    }
+
+    /** @test */
+    public function test_it_compares_a_year_with_a_previous_year()
+    {
+        $user = User::factory()->create();
+
+        Sale::create([
+            'report_date' => '2025-03-01',
+            'client_code' => 'CLI001',
+            'client_name' => 'Client One',
+            'client_class' => 'A',
+            'product_code' => 'PROD1',
+            'product_description' => 'Product',
+            'quantity' => 50,
+            'total_sales' => 500.00,
+        ]);
+
+        Sale::create([
+            'report_date' => '2026-03-01',
+            'client_code' => 'CLI001',
+            'client_name' => 'Client One',
+            'client_class' => 'A',
+            'product_code' => 'PROD1',
+            'product_description' => 'Product',
+            'quantity' => 100,
+            'total_sales' => 1000.00,
+        ]);
+
+        // Filter to year 2026 => compares against 2025 automatically
+        $response = $this->actingAs($user)->get(route('dashboard', ['filter_year' => 2026]));
+        $response->assertStatus(200);
+
+        $cmp = $response->viewData('yearComparison');
+        $this->assertNotNull($cmp);
+        $this->assertEquals(2026, $cmp['year_a']);
+        $this->assertEquals(2025, $cmp['year_b']);
+        $this->assertEquals(100, $cmp['a']['units'][2]); // March
+        $this->assertEquals(50, $cmp['b']['units'][2]);
+        $this->assertEquals(1000.0, $cmp['a']['sales'][2]);
+        $this->assertEquals(500.0, $cmp['b']['sales'][2]);
+        $this->assertEquals(100.0, $cmp['totals']['delta_units']); // +100%
+
+        // Explicit compare_year override
+        $response = $this->actingAs($user)->get(route('dashboard', ['filter_year' => 2025, 'compare_year' => 2026]));
+        $cmp = $response->viewData('yearComparison');
+        $this->assertEquals(2025, $cmp['year_a']);
+        $this->assertEquals(2026, $cmp['year_b']);
+    }
+
+    /** @test */
     public function test_compare_shows_differences_without_importing()
     {
         $user = User::factory()->create();

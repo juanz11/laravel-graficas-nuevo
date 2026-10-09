@@ -116,6 +116,14 @@
                         <span>Importar Excel</span>
                     </button>
 
+                    <button onclick="toggleModal('import-simple-modal')" 
+                        class="text-xs font-semibold px-3 py-2 sm:px-4 bg-amber-600 hover:bg-amber-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-amber-600/20">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span>Importar Simple</span>
+                    </button>
+
                     @if ($selectedMonthVal)
                     <a href="{{ route('manual-entry.edit', ['date' => $selectedMonthVal]) }}" 
                         class="text-xs font-semibold px-3 py-2 sm:px-4 bg-amber-600 hover:bg-amber-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-amber-600/20">
@@ -185,7 +193,7 @@
         @endif
 
         <!-- If No Data is Available -->
-        @if (!$hasData)
+        @if (!$hasData && !$selectedMonthVal && !$selectedYearOnly && !$selectedClient && !$selectedClass && !$selectedProduct)
             <div class="glass-card rounded-3xl p-8 sm:p-16 text-center max-w-2xl mx-auto my-12 shadow-2xl relative overflow-hidden">
                 <div class="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-purple-600/10 blur-[60px]"></div>
                 <div class="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-indigo-600/10 blur-[60px]"></div>
@@ -217,6 +225,7 @@
                 
                 <!-- Filters Form -->
                 <form id="filter-form" action="{{ route('dashboard') }}" method="GET" class="w-full sm:w-auto">
+                    <input type="hidden" name="compare_year" value="{{ $yearComparison['year_b'] ?? '' }}">
                     <div class="flex flex-col sm:flex-row gap-3">
                         <!-- Units/Sales Toggle -->
                         <div class="relative">
@@ -229,19 +238,21 @@
                             </select>
                         </div>
 
-                        <!-- Month Filter -->
-                        <div class="relative">
-                            <label for="month-select" class="sr-only">Seleccionar Mes</label>
-                            <select id="month-select" name="month" onchange="document.getElementById('filter-form').submit();"
+                        <!-- Month/Year Filter -->
+                        <div class="flex gap-2">
+                            <label for="filter-month" class="sr-only">Mes</label>
+                            <select id="filter-month" name="filter_month"
                                 style="background-color: #0c0a18; color: #fff;"
-                                class="w-full sm:w-48 bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
+                                class="w-full sm:w-40 bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
                                 <option value="" style="background-color: #0c0a18; color: #fff;">Todos los meses</option>
-                                @foreach ($months as $m)
-                                    <option value="{{ $m['val'] }}" {{ $m['val'] === $selectedMonthVal ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">
-                                        {{ $m['label'] }}
-                                    </option>
+                                @foreach (['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] as $i => $monthName)
+                                    <option value="{{ $i + 1 }}" {{ (int) ($filterMonth ?? 0) === $i + 1 ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">{{ $monthName }}</option>
                                 @endforeach
                             </select>
+                            <label for="filter-year" class="sr-only">Año</label>
+                            <input type="number" id="filter-year" name="filter_year" min="1990" max="2100" placeholder="Año"
+                                value="{{ $filterYear ?? '' }}"
+                                class="w-full sm:w-28 bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-all">
                         </div>
 
                         <!-- Class Filter -->
@@ -288,13 +299,22 @@
                         
                         <!-- Clear Filters Button -->
                         @if ($selectedClient || $selectedClass || $selectedProduct)
-                        <a href="{{ route('dashboard', ['month' => $selectedMonthVal]) }}" class="px-6 py-3 bg-white/5 hover:bg-white/10 text-white text-sm font-semibold rounded-xl transition-all text-center">
+                        <a href="{{ route('dashboard', array_filter(['filter_month' => $filterMonth, 'filter_year' => $filterYear])) }}" class="px-6 py-3 bg-white/5 hover:bg-white/10 text-white text-sm font-semibold rounded-xl transition-all text-center">
                             Limpiar
                         </a>
                         @endif
                     </div>
                 </form>
             </div>
+
+            @if (!$hasData)
+                <div class="glass-card rounded-2xl p-10 text-center my-8">
+                    <p class="text-gray-400 text-sm">No hay datos para el período o filtros seleccionados.</p>
+                    <a href="{{ route('dashboard', ['month' => '']) }}" class="inline-block mt-4 text-xs font-semibold text-purple-400 hover:text-purple-300 transition-all">
+                        Ver todos los meses
+                    </a>
+                </div>
+            @else
 
             {{-- KPI Cards Grid - Hidden --}}
             {{-- <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
@@ -403,6 +423,76 @@
                     <canvas id="avgCostChart"></canvas>
                 </div>
             </div>
+
+            <!-- Year-over-Year Comparison -->
+            @if ($yearComparison)
+            <div id="year-compare-container" class="glass-card rounded-2xl p-6 mb-8">
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Comparación Anual</h3>
+                        <p class="text-xs text-gray-400 mt-0.5">Enero a Diciembre — {{ $yearComparison['year_a'] }} vs {{ $yearComparison['year_b'] }}</p>
+                    </div>
+                    <form method="GET" action="{{ route('dashboard') }}" class="flex items-center gap-2">
+                        <input type="hidden" name="filter_month" value="{{ $filterMonth ?? '' }}">
+                        <input type="hidden" name="filter_year" value="{{ $filterYear ?? '' }}">
+                        <input type="hidden" name="view_type" value="{{ $viewType }}">
+                        @if ($selectedClient)
+                            <input type="hidden" name="client" value="{{ $selectedClient }}">
+                        @endif
+                        @if ($selectedClass)
+                            <input type="hidden" name="class" value="{{ $selectedClass }}">
+                        @endif
+                        @if ($selectedProduct)
+                            <input type="hidden" name="product" value="{{ $selectedProduct }}">
+                        @endif
+                        <label for="compare-year" class="text-xs text-gray-400 font-semibold">Comparar con:</label>
+                        <select id="compare-year" name="compare_year" onchange="this.form.submit()"
+                            style="background-color: #0c0a18; color: #fff;"
+                            class="bg-white/5 border border-white/15 hover:border-white/20 rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 cursor-pointer transition-all">
+                            @foreach ($availableYears as $y)
+                                @if ($y !== $yearComparison['year_a'])
+                                    <option value="{{ $y }}" {{ $y === $yearComparison['year_b'] ? 'selected' : '' }} style="background-color: #0c0a18; color: #fff;">{{ $y }}</option>
+                                @endif
+                            @endforeach
+                            @if (! $availableYears->contains($yearComparison['year_b']))
+                                <option value="{{ $yearComparison['year_b'] }}" selected style="background-color: #0c0a18; color: #fff;">{{ $yearComparison['year_b'] }}</option>
+                            @endif
+                        </select>
+                    </form>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                    <div class="bg-white/[0.03] border border-white/5 rounded-xl p-4">
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block mb-1">Unidades del año</span>
+                        <div class="flex items-baseline gap-2 flex-wrap">
+                            <span class="text-lg font-extrabold text-white">{{ number_format($yearComparison['totals']['a_units'], 0, ',', '.') }}</span>
+                            <span class="text-xs text-gray-500">vs {{ number_format($yearComparison['totals']['b_units'], 0, ',', '.') }} en {{ $yearComparison['year_b'] }}</span>
+                            @if ($yearComparison['totals']['delta_units'] !== null)
+                                <span class="text-xs font-bold {{ $yearComparison['totals']['delta_units'] >= 0 ? 'text-emerald-400' : 'text-red-400' }}">
+                                    {{ $yearComparison['totals']['delta_units'] >= 0 ? '+' : '' }}{{ number_format($yearComparison['totals']['delta_units'], 1, ',', '.') }}%
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="bg-white/[0.03] border border-white/5 rounded-xl p-4">
+                        <span class="text-[10px] text-gray-400 uppercase tracking-wider font-semibold block mb-1">Ventas del año ($)</span>
+                        <div class="flex items-baseline gap-2 flex-wrap">
+                            <span class="text-lg font-extrabold text-white">$ {{ number_format($yearComparison['totals']['a_sales'], 2, ',', '.') }}</span>
+                            <span class="text-xs text-gray-500">vs $ {{ number_format($yearComparison['totals']['b_sales'], 2, ',', '.') }} en {{ $yearComparison['year_b'] }}</span>
+                            @if ($yearComparison['totals']['delta_sales'] !== null)
+                                <span class="text-xs font-bold {{ $yearComparison['totals']['delta_sales'] >= 0 ? 'text-emerald-400' : 'text-red-400' }}">
+                                    {{ $yearComparison['totals']['delta_sales'] >= 0 ? '+' : '' }}{{ number_format($yearComparison['totals']['delta_sales'], 1, ',', '.') }}%
+                                </span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+
+                <div class="h-96 w-full relative">
+                    <canvas id="yearCompareChart"></canvas>
+                </div>
+            </div>
+            @endif
 
             <!-- Search and Clients Section -->
             <div class="mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -525,6 +615,7 @@
                     </div>
                 </div>
             </div>
+            @endif
         @endif
     </main>
 
@@ -596,6 +687,71 @@
         </div>
     </div>
 
+    <!-- Import Simple Modal -->
+    <div id="import-simple-modal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen p-4 text-center sm:p-0">
+            <!-- Overlay background -->
+            <div onclick="toggleModal('import-simple-modal')" class="fixed inset-0 bg-[#070510]/80 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+
+            <!-- Modal Content Card -->
+            <div class="relative inline-block align-bottom bg-[#0c0a18] border border-white/10 rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full p-6 sm:p-8">
+                <div class="absolute -top-16 -right-16 w-32 h-32 rounded-full bg-amber-600/10 blur-xl pointer-events-none"></div>
+                
+                <div class="flex items-center justify-between pb-4 border-b border-white/5 mb-6">
+                    <h3 class="text-lg font-bold text-white">Importar Reporte Simple (Improvisado)</h3>
+                    <button onclick="toggleModal('import-simple-modal')" class="text-gray-400 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <form method="POST" action="{{ route('sales.import-simple') }}" enctype="multipart/form-data" class="space-y-6">
+                    @csrf
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">Archivo del Reporte (.xlsx, .xls, .csv, .txt)</label>
+                        
+                        <!-- File Upload Dropzone box -->
+                        <div class="relative border-2 border-dashed border-white/10 hover:border-amber-500/50 rounded-2xl p-6 text-center cursor-pointer bg-white/[0.01] hover:bg-white/[0.02] transition-all group">
+                            <input type="file" name="report_file" required
+                                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                onchange="updateFileNameSimple(this)">
+                            
+                            <div class="space-y-2">
+                                <svg class="w-10 h-10 text-amber-400 group-hover:scale-105 transition-transform mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
+                                <div class="text-sm font-semibold text-white">Haz clic o arrastra el archivo aquí</div>
+                                <p class="text-xs text-gray-500">Formato: Código, Productos, Cliente, Clase, Mes, Año, Unidades, Valores, Tasa Valor USD.</p>
+                            </div>
+                        </div>
+                        <div id="file-name-display-simple" class="mt-3 text-xs text-amber-300 font-semibold hidden flex items-center space-x-1.5 justify-center bg-amber-500/10 p-2 rounded-xl border border-amber-500/20">
+                            <svg class="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span id="selected-file-name-simple"></span>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-gray-500 bg-white/[0.03] border border-white/5 rounded-xl p-3">
+                        Este formato no reemplaza la data ya cargada: solo agrega o actualiza los registros improvisados de los meses incluidos en el archivo.
+                    </p>
+
+                    <div class="flex items-center space-x-3.5 pt-4 border-t border-white/5">
+                        <button type="button" onclick="toggleModal('import-simple-modal')" 
+                            class="flex-1 py-3 text-xs font-bold text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-all">
+                            Cancelar
+                        </button>
+                        <button type="submit" 
+                            class="flex-1 py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-amber-600/20">
+                            Procesar Reporte
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Footer -->
     <footer class="glass-card mt-auto border-t border-white/5 py-6">
         <div class="max-w-7xl mx-auto px-4 text-center text-xs text-gray-500">
@@ -634,6 +790,18 @@
         function updateFileName(input) {
             const display = document.getElementById('file-name-display');
             const label = document.getElementById('selected-file-name');
+            if (input.files && input.files[0]) {
+                label.textContent = input.files[0].name;
+                display.classList.remove('hidden');
+            } else {
+                display.classList.add('hidden');
+            }
+        }
+
+        // Display Uploaded File Name (simple format)
+        function updateFileNameSimple(input) {
+            const display = document.getElementById('file-name-display-simple');
+            const label = document.getElementById('selected-file-name-simple');
             if (input.files && input.files[0]) {
                 label.textContent = input.files[0].name;
                 display.classList.remove('hidden');
@@ -858,6 +1026,81 @@
                 }
             }
         });
+
+        // 1b. Year-over-Year Comparison Chart
+        const yearCmp = {!! json_encode($yearComparison) !!};
+        if (yearCmp) {
+            const cmpLabels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            const cmpCtx = document.getElementById('yearCompareChart').getContext('2d');
+            new Chart(cmpCtx, {
+                type: 'line',
+                data: {
+                    labels: cmpLabels,
+                    datasets: [
+                        {
+                            label: String(yearCmp.year_a),
+                            data: viewType === 'units' ? yearCmp.a.units : yearCmp.a.sales,
+                            borderColor: '#a855f7',
+                            backgroundColor: '#a855f7',
+                            borderWidth: 3,
+                            pointBackgroundColor: '#6366f1',
+                            pointBorderColor: '#fff',
+                            pointHoverRadius: 6,
+                            tension: 0.35
+                        },
+                        {
+                            label: String(yearCmp.year_b),
+                            data: viewType === 'units' ? yearCmp.b.units : yearCmp.b.sales,
+                            borderColor: '#06b6d4',
+                            backgroundColor: '#06b6d4',
+                            borderWidth: 2,
+                            borderDash: [6, 4],
+                            pointRadius: 3,
+                            pointBorderColor: '#fff',
+                            pointHoverRadius: 6,
+                            tension: 0.35
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: { boxWidth: 12, boxHeight: 12, usePointStyle: true }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const val = context.raw;
+                                    if (viewType === 'units') {
+                                        return context.dataset.label + ': ' + val.toLocaleString('es-VE', {maximumFractionDigits: 0}) + ' unidades';
+                                    } else {
+                                        return context.dataset.label + ': $ ' + val.toLocaleString('es-VE', {minimumFractionDigits: 2});
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                            ticks: {
+                                callback: function(value) {
+                                    if (viewType === 'units') {
+                                        return value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k';
+                                    } else {
+                                        return '$ ' + (value >= 1e6 ? (value/1e6).toFixed(1) + 'M' : (value/1e3).toFixed(0) + 'k');
+                                    }
+                                }
+                            }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
 
         // 2. Class Distribution Doughnut Chart (Dynamic from DB)
         const classData = {!! json_encode($salesByClass) !!};
