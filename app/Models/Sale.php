@@ -108,7 +108,7 @@ class Sale extends Model
     /**
      * SQL boolean expression identifying discount/adjustment rows.
      */
-    private static function discountConditionsSql(): string
+    public static function discountConditionsSql(): string
     {
         $conditions = array_map(
             fn ($keyword) => "UPPER(product_description) LIKE '%{$keyword}%'",
@@ -117,7 +117,7 @@ class Sale extends Model
         $conditions[] = 'quantity < 0';
         $conditions[] = 'total_sales < 0';
 
-        return implode(' OR ', $conditions);
+        return '(' . implode(' OR ', $conditions) . ')';
     }
 }
 

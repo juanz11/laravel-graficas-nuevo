@@ -132,6 +132,14 @@
                         <span>Importar Simple</span>
                     </button>
 
+                    <button onclick="toggleModal('import-discounts-modal')" 
+                        class="text-xs font-semibold px-3 py-2 sm:px-4 bg-rose-600 hover:bg-rose-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-rose-600/20">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                        </svg>
+                        <span>Importar TXT</span>
+                    </button>
+
                     @if ($selectedMonthVal)
                     <a href="{{ route('manual-entry.edit', ['date' => $selectedMonthVal]) }}" 
                         class="text-xs font-semibold px-3 py-2 sm:px-4 bg-amber-600 hover:bg-amber-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-amber-600/20">
@@ -760,6 +768,71 @@
         </div>
     </div>
 
+    <!-- Import Discounts TXT Modal -->
+    <div id="import-discounts-modal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen p-4 text-center sm:p-0">
+            <!-- Overlay background -->
+            <div onclick="toggleModal('import-discounts-modal')" class="fixed inset-0 bg-[#070510]/80 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+
+            <!-- Modal Content Card -->
+            <div class="relative inline-block align-bottom bg-[#0c0a18] border border-white/10 rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full p-6 sm:p-8">
+                <div class="absolute -top-16 -right-16 w-32 h-32 rounded-full bg-rose-600/10 blur-xl pointer-events-none"></div>
+                
+                <div class="flex items-center justify-between pb-4 border-b border-white/5 mb-6">
+                    <h3 class="text-lg font-bold text-white">Importar Descuentos (TXT)</h3>
+                    <button onclick="toggleModal('import-discounts-modal')" class="text-gray-400 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <form method="POST" action="{{ route('sales.import-discounts') }}" enctype="multipart/form-data" class="space-y-6">
+                    @csrf
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">Archivo de Devoluciones/Descuentos (.txt, .csv)</label>
+                        
+                        <!-- File Upload Dropzone box -->
+                        <div class="relative border-2 border-dashed border-white/10 hover:border-rose-500/50 rounded-2xl p-6 text-center cursor-pointer bg-white/[0.01] hover:bg-white/[0.02] transition-all group">
+                            <input type="file" name="report_file" accept=".txt,.csv" required
+                                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                onchange="updateFileNameDiscounts(this)">
+                            
+                            <div class="space-y-2">
+                                <svg class="w-10 h-10 text-rose-400 group-hover:scale-105 transition-transform mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
+                                <div class="text-sm font-semibold text-white">Haz clic o arrastra el archivo aquí</div>
+                                <p class="text-xs text-gray-500">Transacciones DEV con bloques de productos en valores negativos.</p>
+                            </div>
+                        </div>
+                        <div id="file-name-display-discounts" class="mt-3 text-xs text-rose-300 font-semibold hidden flex items-center space-x-1.5 justify-center bg-rose-500/10 p-2 rounded-xl border border-rose-500/20">
+                            <svg class="w-4 h-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span id="selected-file-name-discounts"></span>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-gray-500 bg-white/[0.03] border border-white/5 rounded-xl p-3">
+                        Solo se importan las filas con valores negativos (descuentos/devoluciones) y se <strong>reemplazan únicamente los descuentos existentes</strong> del mes del archivo — las ventas normales no se tocan.
+                    </p>
+
+                    <div class="flex items-center space-x-3.5 pt-4 border-t border-white/5">
+                        <button type="button" onclick="toggleModal('import-discounts-modal')" 
+                            class="flex-1 py-3 text-xs font-bold text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-all">
+                            Cancelar
+                        </button>
+                        <button type="submit" 
+                            class="flex-1 py-3 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-rose-600/20">
+                            Procesar TXT
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Footer -->
     <footer class="glass-card mt-auto border-t border-white/5 py-6">
         <div class="max-w-7xl mx-auto px-4 text-center text-xs text-gray-500">
@@ -810,6 +883,18 @@
         function updateFileNameSimple(input) {
             const display = document.getElementById('file-name-display-simple');
             const label = document.getElementById('selected-file-name-simple');
+            if (input.files && input.files[0]) {
+                label.textContent = input.files[0].name;
+                display.classList.remove('hidden');
+            } else {
+                display.classList.add('hidden');
+            }
+        }
+
+        // Display Uploaded File Name (discounts TXT)
+        function updateFileNameDiscounts(input) {
+            const display = document.getElementById('file-name-display-discounts');
+            const label = document.getElementById('selected-file-name-discounts');
             if (input.files && input.files[0]) {
                 label.textContent = input.files[0].name;
                 display.classList.remove('hidden');

@@ -773,6 +773,225 @@ class SaleController extends Controller
     }
 
     /**
+     * Import a TXT devolutions/discounts report. Only discount rows
+     * (negative values or discount keywords) of the month are replaced;
+     * regular sales are left untouched.
+     */
+    public function importDiscounts(Request $request)
+    {
+        $request->validate([
+            'report_file' => 'required|file|max:10240',
+        ]);
+
+        $file = $request->file('report_file');
+        $extension = strtolower($file->getClientOriginalExtension());
+        if (!in_array($extension, ['txt', 'csv'])) {
+            return back()->withErrors(['report_file' => 'El archivo de descuentos debe ser .txt o .csv.']);
+        }
+
+        try {
+            $parsed = $this->parseDiscountReportFile($file->getRealPath());
+        } catch (\Exception $e) {
+            return back()->withErrors(['report_file' => 'Error al procesar el archivo: ' . $e->getMessage()]);
+        }
+
+        if (!$parsed['report_date']) {
+            return back()->withErrors(['report_file' => 'No se pudo detectar el mes del reporte en el archivo.']);
+        }
+
+        if (count($parsed['rows']) === 0) {
+            return back()->withErrors(['report_file' => 'No se encontraron descuentos (valores negativos) en el archivo.']);
+        }
+
+        $reportDate = $parsed['report_date'];
+        $rows = $parsed['rows'];
+
+        // Heredar tasa de cambio y clase de cliente de la data ya cargada del mes
+        $monthRate = Sale::whereDate('report_date', $reportDate)
+            ->where('exchange_rate', '>', 0)
+            ->value('exchange_rate') ?: 0;
+
+        $clientCodes = collect($rows)->pluck('client_code')->unique()->filter()->values();
+        $classMap = Sale::whereIn('client_code', $clientCodes)
+            ->whereNotNull('client_class')->where('client_class', '!=', '')
+            ->pluck('client_class', 'client_code');
+
+        foreach ($rows as &$row) {
+            $row['exchange_rate'] = $monthRate;
+            $row['client_class'] = $classMap->get($row['client_code']) ?: 'GENERAL';
+            $row['created_at'] = now();
+            $row['updated_at'] = now();
+        }
+        unset($row);
+
+        DB::transaction(function () use ($reportDate, $rows) {
+            // Reemplaza SOLO las filas de descuento del mes; ventas normales intactas
+            Sale::whereDate('report_date', $reportDate)
+                ->whereRaw(Sale::discountConditionsSql())
+                ->delete();
+
+            foreach (array_chunk($rows, 500) as $chunk) {
+                Sale::insert($chunk);
+            }
+        });
+
+        $carbonDate = Carbon::parse($reportDate);
+        $monthLabel = $this->getSpanishMonthName($carbonDate->month) . ' ' . $carbonDate->year;
+
+        $message = "Se importaron " . count($rows) . " descuento(s) para {$monthLabel}, reemplazando los existentes.";
+        if ($parsed['unmatched'] > 0) {
+            $message .= " ({$parsed['unmatched']} bloque(s) sin cliente identificado)";
+        }
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Parse the TXT devolutions report (CSV lines): each DEV transaction
+     * carries the client, and each product block that follows a "Código"
+     * header belongs to the transaction whose total matches the block total.
+     */
+    private function parseDiscountReportFile(string $filePath): array
+    {
+        $raw = file_get_contents($filePath);
+        if (!mb_check_encoding($raw, 'UTF-8')) {
+            $raw = mb_convert_encoding($raw, 'UTF-8', 'Windows-1252');
+        }
+        $lines = preg_split('/\r\n|\r|\n/', $raw);
+
+        $reportDate = null;
+        $transactions = [];
+        $blocks = [];
+        $currentRows = null;
+
+        foreach ($lines as $line) {
+            if (trim($line) === '') {
+                continue;
+            }
+            $fields = str_getcsv($line);
+            $first = trim((string)($fields[0] ?? ''));
+            $firstLower = mb_strtolower($first);
+
+            // Fecha del reporte: "Desde el 1/1/2026 hasta el 31/1/2026"
+            if (!$reportDate && preg_match('/Desde el\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i', $line, $m)) {
+                $reportDate = sprintf('%04d-%02d-01', $m[3], $m[2]);
+            }
+
+            // Línea de transacción DEV: empieza con fecha dd/mm/yy
+            if (preg_match('/^\d{1,2}\/\d{1,2}\/\d{2}$/', $first) && count($fields) >= 7) {
+                $clientField = trim((string)end($fields));
+                $parts = preg_split('/\s+/', $clientField, 2);
+                $transactions[] = [
+                    'date' => $first,
+                    'doc' => trim((string)($fields[1] ?? '')),
+                    'amount' => $this->cleanAmount($fields[4] ?? '0'),
+                    'client_code' => $parts[0] ?? $clientField,
+                    'client_name' => $parts[1] ?? $clientField,
+                    'used' => false,
+                ];
+                continue;
+            }
+
+            // Cabecera de tabla de productos
+            if (str_contains($firstLower, 'código') || str_contains($firstLower, 'codigo')) {
+                $currentRows = [];
+                continue;
+            }
+
+            // Cierre de bloque: "Totales ....","-X" (pocas columnas).
+            // Líneas "Totales...." de resumen general (muchas columnas) se ignoran
+            // sin cerrar el bloque abierto.
+            if (str_contains($firstLower, 'totales')) {
+                if (count($fields) <= 3) {
+                    if ($currentRows !== null) {
+                        $blocks[] = [
+                            'rows' => $currentRows,
+                            'total' => $this->cleanAmount($fields[1] ?? '0'),
+                        ];
+                    }
+                    $currentRows = null;
+                }
+                continue;
+            }
+
+            // Fila de producto dentro de un bloque: solo valores negativos (descuentos)
+            if ($currentRows !== null && count($fields) >= 6) {
+                $qty = $this->cleanAmount($fields[4] ?? '0');
+                $total = $this->cleanAmount($fields[5] ?? '0');
+                if ($qty < 0 || $total < 0) {
+                    $currentRows[] = [
+                        'product_code' => $first,
+                        'product_description' => trim((string)($fields[1] ?? '')),
+                        'quantity' => (int) round($qty),
+                        'total_sales' => $total,
+                    ];
+                }
+                continue;
+            }
+        }
+
+        // Fallback: derivar el mes de la primera transacción si no hubo cabecera
+        if (!$reportDate && !empty($transactions)) {
+            try {
+                $reportDate = Carbon::createFromFormat('d/m/y', $transactions[0]['date'])
+                    ->startOfMonth()->format('Y-m-d');
+            } catch (\Exception $e) {
+                // reportDate stays null; caller validates
+            }
+        }
+
+        // Emparejar bloques con transacciones (en orden, validando el monto)
+        $sales = [];
+        $unmatched = 0;
+        $ti = 0;
+
+        foreach ($blocks as $block) {
+            $tx = null;
+
+            // Siguiente transacción sin usar, si el monto coincide
+            while (isset($transactions[$ti]) && $transactions[$ti]['used']) {
+                $ti++;
+            }
+            if (isset($transactions[$ti])
+                && abs(abs($transactions[$ti]['amount']) - abs($block['total'])) < 0.02) {
+                $tx = $transactions[$ti];
+                $transactions[$ti]['used'] = true;
+            } else {
+                // Fallback: buscar cualquier transacción sin usar con ese monto
+                foreach ($transactions as $j => $t) {
+                    if (!$t['used'] && abs(abs($t['amount']) - abs($block['total'])) < 0.02) {
+                        $tx = $t;
+                        $transactions[$j]['used'] = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!$tx) {
+                $unmatched++;
+                $tx = ['client_code' => 'DESCONOCIDO', 'client_name' => 'DESCONOCIDO'];
+            }
+
+            foreach ($block['rows'] as $r) {
+                $sales[] = [
+                    'report_date' => $reportDate,
+                    'client_code' => $tx['client_code'],
+                    'client_name' => $tx['client_name'],
+                    'product_code' => $r['product_code'],
+                    'product_description' => $r['product_description'],
+                    'quantity' => $r['quantity'],
+                    'total_sales' => $r['total_sales'],
+                    'total_cost' => 0,
+                    'total_utility' => 0,
+                    'utility_percentage' => 0,
+                ];
+            }
+        }
+
+        return ['report_date' => $reportDate, 'rows' => $sales, 'unmatched' => $unmatched];
+    }
+
+    /**
      * Show the report comparison form.
      */
     public function showCompare()
@@ -914,6 +1133,11 @@ class SaleController extends Controller
         $val = trim((string)$val);
         
         $isNegative = false;
+        // Formato contable: monto entre paréntesis es negativo
+        if (preg_match('/^\((.*)\)$/', $val, $pm)) {
+            $isNegative = true;
+            $val = trim($pm[1]);
+        }
         if (str_starts_with($val, '--') || str_starts_with($val, '-')) {
             $isNegative = true;
             $val = ltrim($val, '-');

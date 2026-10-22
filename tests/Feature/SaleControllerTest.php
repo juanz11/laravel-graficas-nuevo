@@ -536,6 +536,90 @@ class SaleControllerTest extends TestCase
     }
 
     /** @test */
+    public function test_discounts_txt_import_replaces_only_discount_rows()
+    {
+        $user = User::factory()->create();
+
+        // January: one normal sale + one old discount (to be replaced)
+        Sale::create([
+            'report_date' => '2026-01-01',
+            'exchange_rate' => 50.00,
+            'client_code' => '000202001',
+            'client_name' => 'FARMATODO, C.A.',
+            'client_class' => 'FARMATODO',
+            'product_code' => 'PROD1',
+            'product_description' => 'Real Product',
+            'quantity' => 10,
+            'total_sales' => 100.00,
+        ]);
+        Sale::create([
+            'report_date' => '2026-01-01',
+            'exchange_rate' => 50.00,
+            'client_code' => '000202001',
+            'client_name' => 'FARMATODO, C.A.',
+            'client_class' => 'FARMATODO',
+            'product_code' => 'OLD1',
+            'product_description' => 'DESCUENTO VIEJO',
+            'quantity' => -1,
+            'total_sales' => -5.00,
+        ]);
+        // February discount must survive untouched
+        Sale::create([
+            'report_date' => '2026-02-01',
+            'exchange_rate' => 50.00,
+            'client_code' => '000202001',
+            'client_name' => 'FARMATODO, C.A.',
+            'client_class' => 'FARMATODO',
+            'product_code' => 'OLD2',
+            'product_description' => 'DESCUENTO FEBRERO',
+            'quantity' => -1,
+            'total_sales' => -9.00,
+        ]);
+
+        $txt = implode("\n", [
+            '"Transacciones Procesadas en Ventas","Tipo transacción : ** Devoluciones ***","Desde el 1/1/2026 hasta el 31/1/2026",,Fecha,Número,Cliente,"Monto Neto",Impuestos,"Total Operación",Contado,Crédito',
+            '"Código ","Descripción ","Ex. Actual",Dep.,"Cantidad ","Total Precio "',
+            '4112029E,"DESCUENTO POR ACUERDO COMERCIAL","0,00",001,"-1,00","-386.521,64"',
+            '"Totales ....","-386.521,64"',
+            '13/01/26,DEV003065,"(386.521,64) ","0,00 ","(386.521,64) ","0,00 ","(386.521,64) ","000202001 FARMATODO, C.A."',
+            '13/01/26,DEV003066,"(2.742,36) ","0,00 ","(2.742,36) ","0,00 ","(2.742,36) ","J307273178 FARMACIA KROMI, C.A."',
+            '"Código ","Descripción ","Ex. Actual",Dep.,"Cantidad ","Total Precio "',
+            '4112029E,"DESCUENTO POR ACUERDO COMERCIAL","0,00",001,"-1,00","-2.742,36"',
+            '"Totales ....","-2.742,36"',
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'dev') . '.txt';
+        file_put_contents($path, $txt);
+
+        $response = $this->actingAs($user)->post(route('sales.import-discounts'), [
+            'report_file' => new \Illuminate\Http\UploadedFile($path, 'devoluciones.txt', 'text/plain', null, true),
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        // Normal sale untouched, old January discount replaced
+        $this->assertNotNull(Sale::where('product_code', 'PROD1')->first());
+        $this->assertNull(Sale::where('product_code', 'OLD1')->first());
+        // February discount untouched
+        $this->assertNotNull(Sale::where('product_code', 'OLD2')->first());
+
+        // Two new discount rows with correct clients
+        $new = Sale::where('product_code', '4112029E')->orderBy('total_sales')->get();
+        $this->assertCount(2, $new);
+        $this->assertEquals(-386521.64, (float) $new[0]->total_sales);
+        $this->assertEquals('000202001', $new[0]->client_code);
+        $this->assertEquals('FARMATODO', $new[0]->client_class); // inherited
+        $this->assertEquals(-2742.36, (float) $new[1]->total_sales);
+        $this->assertEquals('J307273178', $new[1]->client_code);
+        $this->assertEquals(-1, $new[1]->quantity);
+
+        // Dashboard: units ignore the discounts, sales subtract them
+        $response = $this->actingAs($user)->get(route('dashboard', ['filter_month' => 1, 'filter_year' => 2026]));
+        $kpis = $response->viewData('kpis');
+        $this->assertEquals(10, $kpis['total_quantity']);
+    }
+
+    /** @test */
     public function test_compare_shows_differences_without_importing()
     {
         $user = User::factory()->create();
