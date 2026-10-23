@@ -41,34 +41,11 @@
     <div class="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full bg-purple-500/5 blur-[120px] pointer-events-none"></div>
 
     <!-- Navigation Header -->
-    <nav class="glass-card sticky top-0 z-50 border-b border-white/5 bg-[#090714]/80 backdrop-blur-md">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
-                <!-- Logo & Brand -->
-                <div class="flex items-center space-x-3">
-                    <div class="bg-white/10 p-2 rounded-xl border border-white/10 shrink-0">
-                        <img src="{{ asset('logo.png') }}" class="h-8 w-auto object-contain" alt="Logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                        <span class="hidden text-white font-bold tracking-wider">SNC</span>
-                    </div>
-                    <div>
-                        <span class="text-white font-bold text-base tracking-tight block">SNC Pharma</span>
-                        <span class="text-[10px] text-purple-400 font-semibold block uppercase tracking-wider -mt-1">Comparar Reporte</span>
-                    </div>
-                </div>
+    @include('layouts.sidebar')
 
-                <!-- Back to Dashboard -->
-                <div>
-                    <a href="{{ route('dashboard') }}" 
-                        class="text-xs font-semibold px-3 py-2 sm:px-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl transition-all flex items-center space-x-1.5">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
-                        <span class="hidden sm:inline">Volver al Dashboard</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <div id="main-wrapper" class="lg:pl-64 flex flex-col min-h-screen">
+        @include('layouts.topbar', ['title' => 'Comparar Reporte', 'subtitle' => 'Comparación con Excel'])
+
 
     <!-- Main Content -->
     <main class="flex-grow relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
@@ -286,6 +263,7 @@
             &copy; 2026 SNC Pharma. Todos los derechos reservados. | Panel de Estadísticas Comerciales
         </div>
     </footer>
+    </div>
 
     <script>
         function updateFileName(input) {

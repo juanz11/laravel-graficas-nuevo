@@ -57,127 +57,11 @@
         <span>Salir de Pantalla Completa</span>
     </button>
 
-    <!-- Navigation Header -->
-    <nav class="glass-card sticky top-0 z-50 border-b border-white/5 bg-[#090714]/80 backdrop-blur-md">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16">
-                <!-- Logo & Brand -->
-                <div class="flex items-center space-x-3">
-                    <div class="bg-white/10 p-2 rounded-xl border border-white/10 shrink-0">
-                        <img src="{{ asset('logo.png') }}" class="h-8 w-auto object-contain" alt="Logo" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                        <span class="hidden text-white font-bold tracking-wider">SNC</span>
-                    </div>
-                    <div>
-                        <span class="text-white font-bold text-base tracking-tight block">SNC Pharma</span>
-                        <span class="text-[10px] text-purple-400 font-semibold block uppercase tracking-wider -mt-1">Estadísticas de Venta</span>
-                    </div>
-                </div>
+    @include('layouts.sidebar')
 
-                <!-- User Info & Action -->
-                <div class="flex items-center space-x-3 sm:space-x-4">
-                    <button onclick="toggleFullscreen()" id="fullscreen-btn"
-                        class="text-xs font-semibold px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl transition-all flex items-center space-x-1.5">
-                        <svg id="fullscreen-icon" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                        </svg>
-                        <span class="hidden sm:inline">Pantalla Completa</span>
-                    </button>
+    <div id="main-wrapper" class="lg:pl-64 flex flex-col min-h-screen">
+        @include('layouts.topbar', ['title' => 'Estadísticas de Venta', 'subtitle' => $selectedMonthLabel ?? 'Panel de control'])
 
-                    <a href="{{ route('manual-entry') }}" 
-                        class="text-xs font-semibold px-3 py-2 sm:px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-emerald-600/20">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        <span class="hidden sm:inline">Entrada Manual</span>
-                    </a>
-
-                    <a href="{{ route('sales.list') }}" 
-                        class="text-xs font-semibold px-3 py-2 sm:px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-indigo-600/20">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <span class="hidden sm:inline">Gestionar Ventas</span>
-                    </a>
-
-                    <a href="{{ route('clients.index') }}" 
-                        class="text-xs font-semibold px-3 py-2 sm:px-4 bg-teal-600 hover:bg-teal-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-teal-600/20">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        <span class="hidden sm:inline">Clientes</span>
-                    </a>
-
-                    <a href="{{ route('compare') }}" 
-                        class="text-xs font-semibold px-3 py-2 sm:px-4 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-cyan-600/20">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                        </svg>
-                        <span class="hidden sm:inline">Comparar</span>
-                    </a>
-
-                    <button onclick="toggleModal('import-modal')" 
-                        class="text-xs font-semibold px-3 py-2 sm:px-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-purple-600/20">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                        </svg>
-                        <span>Importar Excel</span>
-                    </button>
-
-                    <button onclick="toggleModal('import-simple-modal')" 
-                        class="text-xs font-semibold px-3 py-2 sm:px-4 bg-amber-600 hover:bg-amber-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-amber-600/20">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <span>Importar Simple</span>
-                    </button>
-
-                    <button onclick="toggleModal('import-discounts-modal')" 
-                        class="text-xs font-semibold px-3 py-2 sm:px-4 bg-rose-600 hover:bg-rose-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-rose-600/20">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
-                        </svg>
-                        <span>Importar TXT</span>
-                    </button>
-
-                    @if ($selectedMonthVal)
-                    <a href="{{ route('manual-entry.edit', ['date' => $selectedMonthVal]) }}" 
-                        class="text-xs font-semibold px-3 py-2 sm:px-4 bg-amber-600 hover:bg-amber-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-amber-600/20">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        <span>Editar Mes</span>
-                    </a>
-
-                    <button type="button" onclick="updateMonthRate()"
-                        class="text-xs font-semibold px-3 py-2 sm:px-4 bg-teal-600 hover:bg-teal-500 text-white rounded-xl transition-all flex items-center space-x-1.5 shadow-lg shadow-teal-600/20">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span>Actualizar Tasa</span>
-                    </button>
-
-                    <form id="update-rate-form" action="{{ route('sales.update-rate') }}" method="POST" class="hidden">
-                        @csrf
-                        <input type="hidden" name="month" value="{{ $selectedMonthVal }}">
-                        <input type="hidden" name="exchange_rate" id="update-rate-input">
-                    </form>
-                    @endif
-
-                    <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">
-                        @csrf
-                    </form>
-                    <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" 
-                        class="text-xs font-semibold px-3 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-200 hover:text-white rounded-xl transition-all flex items-center space-x-1.5">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        <span class="hidden sm:inline">Cerrar Sesión</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </nav>
 
     <!-- Main Content Area -->
     <main class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 relative z-10">
@@ -849,6 +733,7 @@
             &copy; 2026 SNC Pharma. Todos los derechos reservados. | Panel de Estadísticas Comerciales
         </div>
     </footer>
+    </div>
 
     <!-- JS Logic -->
     <script>
@@ -876,6 +761,14 @@
                 document.body.classList.remove('overflow-hidden');
             }
         }
+
+        // Auto-open a modal when arriving with ?open=modal-id (from sidebar on other pages)
+        document.addEventListener('DOMContentLoaded', function () {
+            const open = new URLSearchParams(window.location.search).get('open');
+            if (open && document.getElementById(open)) {
+                toggleModal(open);
+            }
+        });
 
         // Display Uploaded File Name
         function updateFileName(input) {
@@ -967,7 +860,8 @@
 
         // Show only charts in fullscreen mode
         function showChartsOnly(showOnlyCharts) {
-            const nav = document.querySelector('nav');
+            const nav = document.querySelector('aside');
+            const topbar = document.querySelector('header');
             const filterBar = document.querySelector('.flex.flex-col.sm\\:flex-row.sm\\:items-center.sm\\:justify-between.gap-4.mb-8');
             const searchSection = document.querySelector('.mb-6.flex.flex-col.sm\\:flex-row');
             const clientsContainer = document.getElementById('clients-container');
@@ -975,11 +869,13 @@
             const chartsContainer = document.getElementById('charts-container');
             const additionalChartsContainer = document.getElementById('additional-charts-container');
             const main = document.querySelector('main');
+            const sidebarWrapper = document.querySelector('.lg\\:pl-64');
             const exitBtn = document.getElementById('exit-fullscreen-btn');
 
             if (showOnlyCharts) {
                 // Hide all non-chart elements
                 if (nav) nav.style.display = 'none';
+                if (topbar) topbar.style.display = 'none';
                 if (filterBar) filterBar.style.display = 'none';
                 if (searchSection) searchSection.style.display = 'none';
                 if (clientsContainer) clientsContainer.style.display = 'none';
@@ -1007,9 +903,13 @@
                     main.style.padding = '0';
                     main.style.maxWidth = '100%';
                 }
+                if (sidebarWrapper) {
+                    sidebarWrapper.style.paddingLeft = '0';
+                }
             } else {
                 // Restore all elements
                 if (nav) nav.style.display = '';
+                if (topbar) topbar.style.display = '';
                 if (filterBar) filterBar.style.display = '';
                 if (searchSection) searchSection.style.display = '';
                 if (clientsContainer) clientsContainer.style.display = '';
@@ -1037,6 +937,9 @@
                     main.style.padding = '';
                     main.style.maxWidth = '';
                 }
+                if (sidebarWrapper) {
+                    sidebarWrapper.style.paddingLeft = '';
+                }
             }
         }
 
@@ -1044,6 +947,7 @@
         function updateFullscreenIcon(isFullscreen) {
             const icon = document.getElementById('fullscreen-icon');
             const btnText = document.querySelector('#fullscreen-btn span');
+            if (!icon) return;
             if (isFullscreen) {
                 icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />';
                 if (btnText) btnText.textContent = 'Salir de Pantalla Completa';
