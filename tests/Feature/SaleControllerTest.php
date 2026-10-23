@@ -620,6 +620,79 @@ class SaleControllerTest extends TestCase
     }
 
     /** @test */
+    public function test_export_products_downloads_excel_with_all_products()
+    {
+        $user = User::factory()->create();
+
+        // More than 15 products to prove the export is not limited to the top 15
+        for ($i = 1; $i <= 18; $i++) {
+            Sale::create([
+                'report_date' => '2026-01-01',
+                'exchange_rate' => 50.00,
+                'client_code' => 'CLI001',
+                'client_name' => 'Client A',
+                'client_class' => 'A',
+                'product_code' => 'P' . $i,
+                'product_description' => 'Producto ' . $i,
+                'quantity' => $i,
+                'total_sales' => $i * 10,
+            ]);
+        }
+        // Discount row: contributes 0 units, must not appear in the export
+        Sale::create([
+            'report_date' => '2026-01-01',
+            'exchange_rate' => 50.00,
+            'client_code' => 'CLI001',
+            'client_name' => 'Client A',
+            'client_class' => 'A',
+            'product_code' => 'DESC1',
+            'product_description' => 'DESCUENTO GENERAL',
+            'quantity' => -1,
+            'total_sales' => -500,
+        ]);
+        // Another month must not be included
+        Sale::create([
+            'report_date' => '2026-02-01',
+            'exchange_rate' => 50.00,
+            'client_code' => 'CLI001',
+            'client_name' => 'Client A',
+            'client_class' => 'A',
+            'product_code' => 'FEB1',
+            'product_description' => 'Producto Febrero',
+            'quantity' => 99,
+            'total_sales' => 990,
+        ]);
+
+        $response = $this->actingAs($user)->get(route('sales.export-products', [
+            'filter_month' => 1,
+            'filter_year' => 2026,
+        ]));
+
+        $response->assertOk();
+        $response->assertHeader('content-disposition');
+        $this->assertStringContainsString('productos-2026-01.xlsx', $response->headers->get('content-disposition'));
+
+        $tmp = tempnam(sys_get_temp_dir(), 'exp') . '.xlsx';
+        file_put_contents($tmp, $response->streamedContent());
+        $sheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($tmp)->getActiveSheet();
+        $rows = $sheet->toArray();
+
+        $this->assertEquals(['Producto', 'Unidades', 'Porcentaje'], $rows[0]);
+        $this->assertCount(19, $rows); // header + 18 products (no discount, no February)
+
+        $totalUnits = array_sum(array_map(fn($i) => $i, range(1, 18)));
+        $descs = array_column($rows, 0);
+        $this->assertNotContains('DESCUENTO GENERAL', $descs);
+        $this->assertNotContains('Producto Febrero', $descs);
+        // Highest qty first, percentage = qty share of total units
+        $this->assertEquals('Producto 18', $rows[1][0]);
+        $this->assertEquals(18, $rows[1][1]);
+        // toArray() shows the formatted %; the raw cell holds the fraction
+        $this->assertEquals('10.53%', $rows[1][2]);
+        $this->assertEqualsWithDelta(18 / $totalUnits, $sheet->getCell('C2')->getValue(), 0.0001);
+    }
+
+    /** @test */
     public function test_compare_shows_differences_without_importing()
     {
         $user = User::factory()->create();

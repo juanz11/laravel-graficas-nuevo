@@ -10,6 +10,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/sales/import', [SaleController::class, 'import'])->name('sales.import');
     Route::post('/sales/import-simple', [SaleController::class, 'importSimple'])->name('sales.import-simple');
     Route::post('/sales/import-discounts', [SaleController::class, 'importDiscounts'])->name('sales.import-discounts');
+    Route::get('/sales/export-products', [SaleController::class, 'exportProducts'])->name('sales.export-products');
     Route::get('/compare', [SaleController::class, 'showCompare'])->name('compare');
     Route::post('/compare', [SaleController::class, 'compare'])->name('compare.run');
     Route::get('/manual-entry', [SaleController::class, 'showManualEntry'])->name('manual-entry');

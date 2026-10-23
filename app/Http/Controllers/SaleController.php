@@ -31,25 +31,7 @@ class SaleController extends Controller
         });
 
         // 2. Determinar el mes/año seleccionado
-        $selectedMonthVal = null;
-        $selectedYearOnly = null;
-
-        if ($request->hasAny(['filter_month', 'filter_year'])) {
-            // Filtro Mes + Año: ambos => mes exacto, solo año => año completo,
-            // ambos vacíos => todos los meses
-            $filterMonthNum = (int) $request->input('filter_month');
-            $filterYearNum = (int) $request->input('filter_year');
-            if ($filterYearNum && $filterMonthNum >= 1 && $filterMonthNum <= 12) {
-                $selectedMonthVal = sprintf('%04d-%02d-01', $filterYearNum, $filterMonthNum);
-            } elseif ($filterYearNum) {
-                $selectedYearOnly = $filterYearNum;
-            }
-        } elseif ($request->has('month')) {
-            $selectedMonthVal = $request->input('month'); // puede ser "" para "Todos los meses"
-        } elseif ($availableDates->isNotEmpty()) {
-            // Por defecto en la primera carga, mostramos el último mes disponible
-            $selectedMonthVal = $availableDates->first()->format('Y-m-d');
-        }
+        [$selectedMonthVal, $selectedYearOnly] = $this->resolvePeriod($request, $availableDates);
 
         if ($selectedMonthVal) {
             $selectedMonth = Carbon::parse($selectedMonthVal);
@@ -374,6 +356,35 @@ class SaleController extends Controller
         } elseif ($year) {
             $query->whereYear('report_date', $year);
         }
+    }
+
+    /**
+     * Resolve the selected period from the request.
+     * Returns [monthVal 'Y-m-d'|null, yearOnly int|null].
+     */
+    private function resolvePeriod(Request $request, $availableDates): array
+    {
+        if ($request->hasAny(['filter_month', 'filter_year'])) {
+            // Filtro Mes + Año: ambos => mes exacto, solo año => año completo,
+            // ambos vacíos => todos los meses
+            $filterMonthNum = (int) $request->input('filter_month');
+            $filterYearNum = (int) $request->input('filter_year');
+            if ($filterYearNum && $filterMonthNum >= 1 && $filterMonthNum <= 12) {
+                return [sprintf('%04d-%02d-01', $filterYearNum, $filterMonthNum), null];
+            }
+            if ($filterYearNum) {
+                return [null, $filterYearNum];
+            }
+            return [null, null];
+        }
+        if ($request->has('month')) {
+            return [$request->input('month') ?: null, null]; // "" => "Todos los meses"
+        }
+        if ($availableDates->isNotEmpty()) {
+            // Por defecto en la primera carga, mostramos el último mes disponible
+            return [$availableDates->first()->format('Y-m-d'), null];
+        }
+        return [null, null];
     }
 
     /**
@@ -844,6 +855,88 @@ class SaleController extends Controller
         }
 
         return back()->with('success', $message);
+    }
+
+    /**
+     * Export ALL products of the selected period to Excel:
+     * Código, Producto, Unidades y % de participación en unidades.
+     * Respects the same filters as the dashboard.
+     */
+    public function exportProducts(Request $request)
+    {
+        $availableDates = Sale::select('report_date')
+            ->distinct()
+            ->orderBy('report_date', 'desc')
+            ->pluck('report_date');
+
+        [$selectedMonthVal, $selectedYearOnly] = $this->resolvePeriod($request, $availableDates);
+
+        $selectedClient = $request->input('client');
+        $selectedClass = $request->input('class');
+        $selectedProduct = $request->input('product');
+
+        $query = Sale::query();
+        $this->applyPeriodFilter($query, $selectedMonthVal, $selectedYearOnly);
+
+        if ($selectedClient) {
+            $query->where('client_code', $selectedClient);
+        }
+        if ($selectedClass) {
+            $query->where('client_class', $selectedClass);
+        }
+        if ($selectedProduct) {
+            $query->where(function ($q) use ($selectedProduct) {
+                $q->where('product_code', 'like', '%' . $selectedProduct . '%')
+                  ->orWhere('product_description', 'like', '%' . $selectedProduct . '%');
+            });
+        }
+
+        $products = $query
+            ->select(
+                'product_code',
+                'product_description',
+                DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ') as total_qty')
+            )
+            ->groupBy('product_code', 'product_description')
+            ->having(DB::raw('SUM(' . Sale::unitsExcludingDiscountsSql() . ')'), '>', 0)
+            ->orderBy('total_qty', 'desc')
+            ->get();
+
+        $totalUnits = (float) $products->sum('total_qty');
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Productos');
+
+        $sheet->fromArray(['Producto', 'Unidades', 'Porcentaje'], null, 'A1');
+        $sheet->getStyle('A1:C1')->getFont()->setBold(true);
+
+        $row = 2;
+        foreach ($products as $p) {
+            $sheet->setCellValue('A' . $row, $p->product_description);
+            $sheet->setCellValue('B' . $row, (float) $p->total_qty);
+            $sheet->setCellValue('C' . $row, $totalUnits > 0 ? ((float) $p->total_qty) / $totalUnits : 0);
+            $sheet->getStyle('C' . $row)->getNumberFormat()->setFormatCode('0.00%');
+            $row++;
+        }
+
+        foreach (['A', 'B', 'C'] as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        if ($selectedMonthVal) {
+            $suffix = Carbon::parse($selectedMonthVal)->format('Y-m');
+        } elseif ($selectedYearOnly) {
+            $suffix = (string) $selectedYearOnly;
+        } else {
+            $suffix = 'todos';
+        }
+
+        return response()->streamDownload(function () use ($spreadsheet) {
+            (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save('php://output');
+        }, "productos-{$suffix}.xlsx", [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
     }
 
     /**

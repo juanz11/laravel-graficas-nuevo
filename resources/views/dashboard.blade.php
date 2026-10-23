@@ -407,7 +407,17 @@
                 <div class="glass-card rounded-2xl p-6">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-bold text-white">Top 15 Productos por Ventas</h3>
-                        <span class="text-xs text-gray-400">Mejores vendidos del mes</span>
+                        <div class="flex items-center space-x-3">
+                            <span class="text-xs text-gray-400">Mejores vendidos del mes</span>
+                            <a href="{{ route('sales.export-products', request()->query()) }}"
+                                class="text-xs font-semibold px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 rounded-lg transition-all flex items-center space-x-1 border border-emerald-500/30"
+                                title="Descargar todos los productos en Excel">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                <span>Excel</span>
+                            </a>
+                        </div>
                     </div>
                     <div class="h-96 w-full relative">
                         <canvas id="productsBarChart"></canvas>
