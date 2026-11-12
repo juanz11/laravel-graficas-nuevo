@@ -727,6 +727,71 @@
         </div>
     </div>
 
+    <!-- Import Invoices Modal -->
+    <div id="import-invoices-modal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen p-4 text-center sm:p-0">
+            <!-- Overlay background -->
+            <div onclick="toggleModal('import-invoices-modal')" class="fixed inset-0 bg-[#070510]/80 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
+
+            <!-- Modal Content Card -->
+            <div class="relative inline-block align-bottom bg-[#0c0a18] border border-white/10 rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full p-6 sm:p-8">
+                <div class="absolute -top-16 -right-16 w-32 h-32 rounded-full bg-emerald-600/10 blur-xl pointer-events-none"></div>
+                
+                <div class="flex items-center justify-between pb-4 border-b border-white/5 mb-6">
+                    <h3 class="text-lg font-bold text-white">Subir Facturas</h3>
+                    <button onclick="toggleModal('import-invoices-modal')" class="text-gray-400 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <form method="POST" action="{{ route('sales.import-invoices') }}" enctype="multipart/form-data" class="space-y-6">
+                    @csrf
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">Archivos de Factura (.xlsx, .xls) — puedes seleccionar varios</label>
+                        
+                        <!-- File Upload Dropzone box -->
+                        <div class="relative border-2 border-dashed border-white/10 hover:border-emerald-500/50 rounded-2xl p-6 text-center cursor-pointer bg-white/[0.01] hover:bg-white/[0.02] transition-all group">
+                            <input type="file" name="report_files[]" accept=".xlsx,.xls" multiple required
+                                class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                onchange="updateFileNameInvoices(this)">
+                            
+                            <div class="space-y-2">
+                                <svg class="w-10 h-10 text-emerald-400 group-hover:scale-105 transition-transform mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <div class="text-sm font-semibold text-white">Haz clic o arrastra las facturas aquí</div>
+                                <p class="text-xs text-gray-500">Formato FACTURA: cliente, RIF, fecha de emisión y productos.</p>
+                            </div>
+                        </div>
+                        <div id="file-name-display-invoices" class="mt-3 text-xs text-emerald-300 font-semibold hidden flex items-center space-x-1.5 justify-center bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
+                            <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span id="selected-file-name-invoices"></span>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-gray-500 bg-white/[0.03] border border-white/5 rounded-xl p-3">
+                        Las ventas de cada factura se <strong>suman</strong> a la data existente del mes de su fecha de emisión — nada se borra. Si vuelves a subir la misma factura, solo se reemplazan sus productos.
+                    </p>
+
+                    <div class="flex items-center space-x-3.5 pt-4 border-t border-white/5">
+                        <button type="button" onclick="toggleModal('import-invoices-modal')" 
+                            class="flex-1 py-3 text-xs font-bold text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-all">
+                            Cancelar
+                        </button>
+                        <button type="submit" 
+                            class="flex-1 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-emerald-600/20">
+                            Procesar Facturas
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Footer -->
     <footer class="glass-card mt-auto border-t border-white/5 py-6">
         <div class="max-w-7xl mx-auto px-4 text-center text-xs text-gray-500">
@@ -800,6 +865,19 @@
             const label = document.getElementById('selected-file-name-discounts');
             if (input.files && input.files[0]) {
                 label.textContent = input.files[0].name;
+                display.classList.remove('hidden');
+            } else {
+                display.classList.add('hidden');
+            }
+        }
+
+        // Display Uploaded File Names (invoices, multi-file)
+        function updateFileNameInvoices(input) {
+            const display = document.getElementById('file-name-display-invoices');
+            const label = document.getElementById('selected-file-name-invoices');
+            if (input.files && input.files.length > 0) {
+                const names = Array.from(input.files).map(f => f.name);
+                label.textContent = names.length + ' archivo(s): ' + names.join(', ');
                 display.classList.remove('hidden');
             } else {
                 display.classList.add('hidden');

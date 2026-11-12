@@ -89,6 +89,12 @@
                 </svg>
                 <span>Importar TXT</span>
             </button>
+            <button onclick="toggleModal('import-invoices-modal'); toggleSidebarMenu(true);" class="{{ $navLink }} {{ $navIdle }} w-full text-left">
+                <svg class="{{ $navIcon }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Subir Facturas</span>
+            </button>
         @else
             <a href="{{ route('dashboard', ['open' => 'import-modal']) }}" class="{{ $navLink }} {{ $navIdle }}">
                 <svg class="{{ $navIcon }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -107,6 +113,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
                 </svg>
                 <span>Importar TXT</span>
+            </a>
+            <a href="{{ route('dashboard', ['open' => 'import-invoices-modal']) }}" class="{{ $navLink }} {{ $navIdle }}">
+                <svg class="{{ $navIcon }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Subir Facturas</span>
             </a>
         @endif
 

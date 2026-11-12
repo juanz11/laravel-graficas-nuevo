@@ -858,6 +858,219 @@ class SaleController extends Controller
     }
 
     /**
+     * Handle the upload of invoice files (FACTURA - FORMATO) and add their
+     * products to the existing data. Re-uploading the same invoice number
+     * replaces only that invoice's rows; all other data is untouched.
+     */
+    public function importInvoices(Request $request)
+    {
+        $request->validate([
+            'report_files'   => 'required|array|min:1',
+            'report_files.*' => 'file|max:10240',
+        ]);
+
+        $invoices = [];
+        $fileErrors = [];
+
+        foreach ($request->file('report_files') as $file) {
+            $extension = strtolower($file->getClientOriginalExtension());
+            if (!in_array($extension, ['xlsx', 'xls'])) {
+                $fileErrors[] = $file->getClientOriginalName() . ': el archivo debe ser .xlsx o .xls.';
+                continue;
+            }
+            try {
+                $parsed = $this->parseInvoiceFile($file->getRealPath(), $file->getClientOriginalName());
+                $invoices = array_merge($invoices, $parsed);
+            } catch (\Exception $e) {
+                $fileErrors[] = $file->getClientOriginalName() . ': ' . $e->getMessage();
+            }
+        }
+
+        if (count($invoices) === 0) {
+            $msg = 'No se encontraron facturas procesables en los archivos.';
+            if ($fileErrors) $msg .= ' ' . implode(' ', $fileErrors);
+            return back()->withErrors(['report_files' => $msg]);
+        }
+
+        // Heredar clase de cliente y tasa del mes de la data ya cargada
+        $clientCodes = collect($invoices)->pluck('client_code')->unique()->filter()->values();
+        $classMap = Sale::whereIn('client_code', $clientCodes)
+            ->whereNotNull('client_class')->where('client_class', '!=', '')
+            ->pluck('client_class', 'client_code');
+        $nameMap = Sale::whereIn('client_code', $clientCodes)
+            ->whereNotNull('client_name')->where('client_name', '!=', '')
+            ->pluck('client_name', 'client_code');
+        $rateDates = collect($invoices)->pluck('report_date')->unique()->values();
+        $rateMap = Sale::where(function ($q) use ($rateDates) {
+                foreach ($rateDates as $d) {
+                    $q->orWhereDate('report_date', $d);
+                }
+            })
+            ->where('exchange_rate', '>', 0)
+            ->get(['report_date', 'exchange_rate'])
+            ->mapWithKeys(fn($s) => [$s->report_date->format('Y-m-d') => (float) $s->exchange_rate]);
+
+        $rowCount = 0;
+        DB::transaction(function () use ($invoices, $classMap, $nameMap, $rateMap, &$rowCount) {
+            foreach ($invoices as $inv) {
+                // Re-subir la misma factura reemplaza solo sus filas
+                Sale::whereDate('report_date', $inv['report_date'])
+                    ->where('invoice_number', $inv['invoice_number'])
+                    ->delete();
+
+                $rate = $rateMap->get($inv['report_date']) ?: 0;
+                $clientClass = $classMap->get($inv['client_code']) ?: 'GENERAL';
+                $clientName = $nameMap->get($inv['client_code']) ?: $inv['client_name'];
+
+                foreach ($inv['rows'] as $r) {
+                    $totalCost = $r['total_sales'] * 0.15;
+                    $totalUtility = $r['total_sales'] - $totalCost;
+                    Sale::create([
+                        'report_date'        => $inv['report_date'],
+                        'exchange_rate'      => $rate,
+                        'client_code'        => $inv['client_code'],
+                        'client_name'        => $clientName,
+                        'client_class'       => $clientClass,
+                        'product_code'       => $r['product_code'],
+                        'product_description'=> $r['product_description'],
+                        'quantity'           => $r['quantity'],
+                        'total_sales'        => $r['total_sales'],
+                        'total_cost'         => $totalCost,
+                        'total_utility'      => $totalUtility,
+                        'utility_percentage' => $r['total_sales'] > 0 ? ($totalUtility / $r['total_sales']) * 100 : 0,
+                        'is_manual'          => true,
+                        'invoice_number'     => $inv['invoice_number'],
+                    ]);
+                    $rowCount++;
+                }
+            }
+        });
+
+        $months = collect($invoices)->pluck('report_date')->unique()
+            ->map(fn($d) => $this->getSpanishMonthName(Carbon::parse($d)->month) . ' ' . Carbon::parse($d)->year)
+            ->implode(', ');
+
+        $message = "Se importaron " . count($invoices) . " factura(s) con {$rowCount} producto(s), sumados a {$months}.";
+        if ($fileErrors) $message .= ' Advertencias: ' . implode(' ', $fileErrors);
+
+        return back()->with('success', $message);
+    }
+
+    /**
+     * Parse a "FACTURA - FORMATO" Excel file. Each sheet that contains a
+     * product table produces one invoice with: client (CLIENTE:/R.I.F.:),
+     * emission date (FECHA EMISIÓN), invoice number (FACTURA #) and the
+     * product rows (Código, Descripción, Cant., Total Bs.).
+     */
+    private function parseInvoiceFile(string $filePath, string $fileName): array
+    {
+        $spreadsheet = IOFactory::load($filePath);
+        $invoices = [];
+
+        foreach ($spreadsheet->getAllSheets() as $sheet) {
+            $rows = $sheet->toArray(null, true, true, true);
+            $clientName = null;
+            $clientRif = null;
+            $emissionDate = null;
+            $invoiceNumber = null;
+            $inProducts = false;
+            $items = [];
+
+            foreach ($rows as $row) {
+                // toArray con referencias de celda: claves 'A', 'B', 'C'...
+                $a = trim((string)($row['A'] ?? ''));
+                $b = trim((string)($row['B'] ?? ''));
+                $o = trim((string)($row['O'] ?? ''));
+
+                if ($clientName === null && stripos($a, 'CLIENTE') !== false) {
+                    $clientName = trim((string)($row['D'] ?? ''));
+                }
+                if ($clientRif === null && (stripos($a, 'R.I.F') !== false || stripos($a, 'RIF:') !== false)) {
+                    $clientRif = trim((string)($row['D'] ?? ''));
+                }
+                if ($emissionDate === null && stripos($o, 'FECHA EMISI') !== false) {
+                    $emissionDate = $this->parseInvoiceDate($row['T'] ?? null);
+                }
+                if ($invoiceNumber === null && stripos($o, 'FACTURA') !== false) {
+                    $num = '';
+                    foreach (range('P', 'Z') as $col) {
+                        $num .= preg_replace('/\s+/', '', (string)($row[$col] ?? ''));
+                    }
+                    $invoiceNumber = $num !== '' ? $num : null;
+                }
+
+                // Encabezado de la tabla de productos: N° | Código | Descripción
+                if (!$inProducts && (stripos($b, 'digo') !== false) && stripos((string)($row['E'] ?? ''), 'Descrip') !== false) {
+                    $inProducts = true;
+                    continue;
+                }
+
+                if ($inProducts) {
+                    // Fin de la tabla: fila de montos
+                    if (stripos($a, 'Monto') !== false || stripos($a, 'Total') !== false) {
+                        break;
+                    }
+                    $code = $b;
+                    $desc = trim((string)($row['E'] ?? ''));
+                    $qty = $this->cleanAmount($row['P'] ?? 0);
+                    $total = $this->cleanAmount($row['U'] ?? 0);
+                    if ($code !== '' && $desc !== '' && ($qty != 0 || $total != 0)) {
+                        $items[] = [
+                            'product_code' => $code,
+                            'product_description' => $desc,
+                            'quantity' => (int) round($qty),
+                            'total_sales' => $total,
+                        ];
+                    }
+                }
+            }
+
+            if (count($items) === 0) {
+                continue; // hoja sin productos (ej. portada vacía)
+            }
+
+            $clientCode = $clientRif ? preg_replace('/\D/', '', $clientRif) : '';
+            if ($clientCode === '') {
+                $clientCode = $clientName ?: 'SIN-CLIENTE';
+            }
+            $invoices[] = [
+                'invoice_number' => $invoiceNumber ?: ($fileName . '-' . $sheet->getTitle()),
+                'report_date' => $emissionDate ?: null,
+                'client_code' => $clientCode,
+                'client_name' => $clientName ?: 'SIN-CLIENTE',
+                'rows' => $items,
+            ];
+        }
+
+        // Sin fecha de emisión: derivar del mes actual del reporte o pedirla
+        foreach ($invoices as &$inv) {
+            if (!$inv['report_date']) {
+                throw new \Exception('No se encontró la FECHA EMISIÓN en la factura ' . $inv['invoice_number'] . '.');
+            }
+        }
+
+        return $invoices;
+    }
+
+    /**
+     * Parse an invoice emission date like "09/11/2026" into "Y-m-01".
+     */
+    private function parseInvoiceDate($val): ?string
+    {
+        $val = trim((string)$val);
+        if ($val === '') return null;
+        foreach (['d/m/Y', 'd/m/y', 'Y-m-d'] as $fmt) {
+            try {
+                $d = Carbon::createFromFormat($fmt, $val);
+                if ($d) return $d->startOfMonth()->format('Y-m-d');
+            } catch (\Exception $e) {
+                // try next format
+            }
+        }
+        return null;
+    }
+
+    /**
      * Export ALL products of the selected period to Excel:
      * Código, Producto, Unidades y % de participación en unidades.
      * Respects the same filters as the dashboard.
@@ -1236,8 +1449,9 @@ class SaleController extends Controller
             $val = ltrim($val, '-');
         }
         
-        // Remover símbolos porcentuales y espacios
-        $val = str_replace(['%', ' ', 'Bs', 'Bs.'], '', $val);
+        // Remover símbolos porcentuales, moneda y espacios
+        // ('Bs.' antes que 'Bs' para no dejar un punto suelto)
+        $val = str_replace(['Bs.', 'Bs', '%', ' '], '', $val);
         
         // Si está vacío después de limpiar
         if (empty($val)) {

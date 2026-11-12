@@ -693,6 +693,63 @@ class SaleControllerTest extends TestCase
     }
 
     /** @test */
+    public function test_invoice_import_adds_rows_and_reupload_replaces_same_invoice()
+    {
+        $user = User::factory()->create();
+
+        // Existing November sale must survive untouched
+        Sale::create([
+            'report_date' => '2026-11-01',
+            'exchange_rate' => 50.00,
+            'client_code' => 'CLI001',
+            'client_name' => 'Client A',
+            'client_class' => 'A',
+            'product_code' => 'EXIST1',
+            'product_description' => 'Existing Product',
+            'quantity' => 10,
+            'total_sales' => 100.00,
+        ]);
+
+        // Build a FACTURA-format xlsx in memory
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setCellValue('A6', 'CLIENTE:')->setCellValue('D6', 'CLIENTE X, C.A.')
+            ->setCellValue('O6', 'FACTURA  #')->setCellValue('T6', '00')->setCellValue('V6', '1234');
+        $sheet->setCellValue('A7', 'R.I.F.:')->setCellValue('D7', 'J-00099999-9');
+        $sheet->setCellValue('A8', 'DIRECCIÓN:')->setCellValue('O8', 'FECHA EMISIÓN:')->setCellValue('T8', '09/11/2026');
+        $sheet->setCellValue('A15', 'N°')->setCellValue('B15', 'Código')->setCellValue('E15', 'Descripción')
+            ->setCellValue('P15', 'Cant.')->setCellValue('U15', 'Total (Bs.)');
+        $sheet->setCellValue('A16', 1)->setCellValue('B16', 'P1')->setCellValue('E16', 'Prod 1')
+            ->setCellValue('P16', 10)->setCellValue('U16', 1000);
+        $sheet->setCellValue('A17', 2)->setCellValue('B17', 'P2')->setCellValue('E17', 'Prod 2')
+            ->setCellValue('P17', 20)->setCellValue('U17', 2000);
+        $sheet->setCellValue('A40', 'Monto Gravable:');
+
+        $path = tempnam(sys_get_temp_dir(), 'inv') . '.xlsx';
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($path);
+
+        $upload = fn() => $this->actingAs($user)->post(route('sales.import-invoices'), [
+            'report_files' => [new \Illuminate\Http\UploadedFile($path, 'factura.xlsx', null, null, true)],
+        ]);
+
+        $upload()->assertSessionHas('success');
+
+        // Added additively: existing sale + 2 invoice rows
+        $this->assertNotNull(Sale::where('product_code', 'EXIST1')->first());
+        $invoiceRows = Sale::where('invoice_number', '001234')->get();
+        $this->assertCount(2, $invoiceRows);
+        $this->assertEquals('000999999', $invoiceRows[0]->client_code);
+        $this->assertEquals('CLIENTE X, C.A.', $invoiceRows[0]->client_name);
+        $this->assertEquals('2026-11-01', $invoiceRows[0]->report_date->format('Y-m-d'));
+        $this->assertTrue((bool) $invoiceRows[0]->is_manual);
+        $this->assertEquals(30, $invoiceRows->sum('quantity'));
+
+        // Re-upload same invoice: replaces its rows, does not duplicate
+        $upload()->assertSessionHas('success');
+        $this->assertCount(2, Sale::where('invoice_number', '001234')->get());
+    }
+
+    /** @test */
     public function test_compare_shows_differences_without_importing()
     {
         $user = User::factory()->create();
