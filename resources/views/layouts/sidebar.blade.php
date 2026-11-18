@@ -68,6 +68,20 @@
             <span>Comparar</span>
         </a>
 
+        <a href="{{ route('forecast') }}" class="{{ $navLink }} {{ request()->routeIs('forecast*') ? $navActive : $navIdle }}">
+            <svg class="{{ $navIcon }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+            <span>Predicción IA</span>
+        </a>
+
+        <a href="{{ route('chat') }}" class="{{ $navLink }} {{ request()->routeIs('chat*') ? $navActive : $navIdle }}">
+            <svg class="{{ $navIcon }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+            <span>Chat IA</span>
+        </a>
+
         <div class="px-3 pt-4 pb-1 text-[10px] font-bold uppercase tracking-widest text-gray-600">Importación</div>
 
         @if ($isDashboard)

@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ChatController;
+use App\Http\Controllers\ForecastController;
 use App\Http\Controllers\SaleController;
 use Illuminate\Support\Facades\Route;
 
@@ -13,6 +15,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/sales/import-invoices', [SaleController::class, 'importInvoices'])->name('sales.import-invoices');
     Route::get('/sales/export-products', [SaleController::class, 'exportProducts'])->name('sales.export-products');
     Route::get('/compare', [SaleController::class, 'showCompare'])->name('compare');
+    Route::get('/forecast', [ForecastController::class, 'index'])->name('forecast');
+    Route::get('/chat', [ChatController::class, 'index'])->name('chat');
+    Route::post('/chat', [ChatController::class, 'ask'])->name('chat.ask');
     Route::post('/compare', [SaleController::class, 'compare'])->name('compare.run');
     Route::get('/manual-entry', [SaleController::class, 'showManualEntry'])->name('manual-entry');
     Route::post('/manual-entry', [SaleController::class, 'storeManualEntry'])->name('manual-entry.store');
