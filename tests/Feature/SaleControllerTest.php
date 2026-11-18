@@ -827,4 +827,60 @@ class SaleControllerTest extends TestCase
         // Nothing was imported
         $this->assertEquals(3, Sale::count());
     }
+
+    /** @test */
+    public function test_discounts_page_lists_only_discount_rows_filtered_by_month()
+    {
+        $user = User::factory()->create();
+
+        // Normal sale - should NOT appear on the discounts page
+        Sale::create([
+            'report_date' => '2026-01-01',
+            'client_code' => 'CLI001',
+            'client_name' => 'Client One',
+            'client_class' => 'A',
+            'product_code' => 'PROD1',
+            'product_description' => 'Normal Product',
+            'quantity' => 10,
+            'total_sales' => 100.00,
+        ]);
+
+        // Discount row in January - should appear
+        Sale::create([
+            'report_date' => '2026-01-01',
+            'client_code' => 'CLI001',
+            'client_name' => 'Client One',
+            'client_class' => 'A',
+            'product_code' => '4112029E',
+            'product_description' => 'DESCUENTO POR ACUERDO COMERCIAL',
+            'quantity' => -1,
+            'total_sales' => -500.00,
+        ]);
+
+        // Discount row in February - only when that month is selected
+        Sale::create([
+            'report_date' => '2026-02-01',
+            'client_code' => 'CLI001',
+            'client_name' => 'Client One',
+            'client_class' => 'A',
+            'product_code' => '4112031E',
+            'product_description' => 'DESCUENTO PROMOCIONAL',
+            'quantity' => -1,
+            'total_sales' => -200.00,
+        ]);
+
+        // All discounts (no month filter)
+        $response = $this->actingAs($user)->get(route('discounts.index'));
+        $response->assertStatus(200);
+        $sales = $response->viewData('sales');
+        $this->assertCount(2, $sales);
+        $this->assertTrue($sales->every(fn ($s) => $s->total_sales < 0));
+
+        // Filtered to January only
+        $response = $this->actingAs($user)->get(route('discounts.index', ['month' => '2026-01-01']));
+        $response->assertStatus(200);
+        $sales = $response->viewData('sales');
+        $this->assertCount(1, $sales);
+        $this->assertEquals('4112029E', $sales->first()->product_code);
+    }
 }

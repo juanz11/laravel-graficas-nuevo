@@ -27,6 +27,7 @@ Route::middleware('auth')->group(function () {
     
     // Rutas para gestionar ventas
     Route::get('/sales', [SaleController::class, 'list'])->name('sales.list');
+    Route::get('/discounts', [SaleController::class, 'discountsIndex'])->name('discounts.index');
     Route::get('/clients', [SaleController::class, 'clientsIndex'])->name('clients.index');
     Route::post('/clients/update', [SaleController::class, 'updateClient'])->name('clients.update');
     Route::get('/sales/{id}/edit', [SaleController::class, 'editJson'])->name('sales.edit-json');

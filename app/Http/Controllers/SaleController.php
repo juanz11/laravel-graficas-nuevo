@@ -1836,6 +1836,68 @@ class SaleController extends Controller
     }
 
     /**
+     * List only discount/adjustment rows (negative values or discount
+     * descriptions) with the same filters as the sales list.
+     */
+    public function discountsIndex(Request $request)
+    {
+        $query = Sale::query()->whereRaw(Sale::discountConditionsSql());
+
+        // 1. Filtrado por mes
+        $selectedMonthVal = $request->input('month');
+        if ($selectedMonthVal) {
+            $query->whereDate('report_date', $selectedMonthVal);
+        }
+
+        // 2. Filtrado por cliente
+        $selectedClient = $request->input('client');
+        if ($selectedClient) {
+            $query->where('client_code', $selectedClient);
+        }
+
+        // 3. Búsqueda por producto o texto general
+        $search = $request->input('search');
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('product_code', 'like', '%' . $search . '%')
+                  ->orWhere('product_description', 'like', '%' . $search . '%')
+                  ->orWhere('client_name', 'like', '%' . $search . '%')
+                  ->orWhere('client_code', 'like', '%' . $search . '%');
+            });
+        }
+
+        $sales = $query->orderBy('report_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->paginate(50)
+            ->withQueryString();
+
+        $availableDates = Sale::select('report_date')
+            ->distinct()
+            ->orderBy('report_date', 'desc')
+            ->pluck('report_date');
+
+        $months = $availableDates->map(function ($date) {
+            $carbon = Carbon::parse($date);
+            return [
+                'val' => $carbon->format('Y-m-d'),
+                'label' => $this->getSpanishMonthName($carbon->month) . ' ' . $carbon->year,
+            ];
+        });
+
+        $clients = Sale::select('client_code', 'client_name')
+            ->distinct()
+            ->orderBy('client_name')
+            ->get();
+
+        $products = Sale::select('product_code', 'product_description')
+            ->distinct()
+            ->orderBy('product_description')
+            ->get();
+
+        return view('discounts', compact('sales', 'months', 'clients', 'products', 'selectedMonthVal', 'selectedClient', 'search'));
+    }
+
+    /**
      * List unique clients (grouped from sales) for the client management module.
      */
     public function clientsIndex(Request $request)
