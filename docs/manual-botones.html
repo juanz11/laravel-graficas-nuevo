@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>SNC Pharma - Manual de Botones</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; font-size: 13px; line-height: 1.55; padding: 40px 48px; }
+  .cover { text-align: center; padding: 40px 0 32px; border-bottom: 3px solid #4f46e5; margin-bottom: 32px; }
+  .cover .logo { font-size: 34px; font-weight: 800; color: #4f46e5; letter-spacing: -1px; }
+  .cover h1 { font-size: 20px; font-weight: 700; margin-top: 8px; }
+  .cover p { color: #64748b; margin-top: 6px; font-size: 12px; }
+  h2 { font-size: 16px; color: #4f46e5; margin: 28px 0 10px; padding-bottom: 4px; border-bottom: 1.5px solid #e0e7ff; }
+  h2 .num { display: inline-block; background: #4f46e5; color: #fff; border-radius: 6px; width: 22px; height: 22px; line-height: 22px; text-align: center; font-size: 12px; margin-right: 8px; vertical-align: middle; }
+  .btn { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; page-break-inside: avoid; }
+  .btn h3 { font-size: 13px; color: #0f172a; margin-bottom: 3px; }
+  .btn h3 .tag { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 20px; margin-left: 6px; vertical-align: middle; }
+  .tag.nav { background: #eef2ff; color: #4f46e5; }
+  .tag.action { background: #ecfdf5; color: #059669; }
+  .tag.warn { background: #fff7ed; color: #ea580c; }
+  .btn p { color: #475569; }
+  .btn p b { color: #1e293b; }
+  .note { background: #fff7ed; border-left: 3px solid #f59e0b; padding: 8px 12px; border-radius: 0 8px 8px 0; margin: 4px 0 10px; font-size: 12px; color: #92400e; }
+  .tip { background: #eef2ff; border-left: 3px solid #4f46e5; padding: 8px 12px; border-radius: 0 8px 8px 0; margin: 4px 0 10px; font-size: 12px; color: #3730a3; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 14px; font-size: 12px; }
+  th { background: #4f46e5; color: #fff; text-align: left; padding: 7px 10px; font-size: 11px; }
+  td { border: 1px solid #e2e8f0; padding: 6px 10px; color: #475569; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .footer { margin-top: 36px; padding-top: 12px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="logo">SNC PHARMA</div>
+  <h1>Manual de Botones — Panel de Estadísticas Comerciales</h1>
+  <p>Guía de referencia: qué hace cada opción del menú lateral y de la pantalla principal</p>
+</div>
+
+<h2><span class="num">1</span>PANEL</h2>
+
+<div class="btn">
+  <h3>Dashboard <span class="tag nav">Página</span></h3>
+  <p><b>Pantalla principal</b> del sistema. Muestra los KPIs del período (unidades, ventas en Bs y $, utilidad), la evolución mensual de ventas, ventas por clase de cliente, Top 15 de productos y clientes, precio promedio por producto, comparación anual, desglose por cliente y resumen del período.</p>
+  <p>Arriba están los <b>filtros</b>: <b>Mes</b> (selector con nombres + opción "Todos los meses"), <b>Año</b>, <b>Cliente</b>, <b>Clase</b> y <b>Producto</b>. El botón <b>Filtrar</b> aplica y <b>Limpiar</b> quita los filtros de cliente/clase/producto conservando el período. Mes + Año filtra ese mes; solo Año filtra el año completo; todo vacío muestra el histórico.</p>
+</div>
+
+<div class="btn">
+  <h3>Descargar Excel (junto a "Top 15 Productos") <span class="tag action">Descarga</span></h3>
+  <p>Genera un archivo <b>.xlsx con TODOS los productos</b> del período filtrado (no solo los 15 del gráfico). Columnas: <b>Producto, Unidades y Porcentaje</b> (participación sobre el total de unidades). Respeta los filtros activos, excluye descuentos y productos con 0 unidades, ordenado de mayor a menor.</p>
+</div>
+
+<div class="btn">
+  <h3>Toggle Unidades / Ventas <span class="tag action">Interruptor</span></h3>
+  <p>En los gráficos del dashboard cambia la serie mostrada entre <b>cantidad de unidades</b> y <b>monto de ventas</b>. Aplica a evolución mensual, comparación anual, top productos y top clientes.</p>
+</div>
+
+<div class="btn">
+  <h3>Comparar con (en Comparación Anual) <span class="tag action">Selector</span></h3>
+  <p>Elige el año contra el cual comparar el año base (el del filtro actual o el más reciente). El gráfico muestra Enero–Diciembre de ambos años y tarjetas con el % de variación.</p>
+</div>
+
+<h2><span class="num">2</span>GESTIÓN</h2>
+
+<div class="btn">
+  <h3>Entrada Manual <span class="tag nav">Página</span></h3>
+  <p>Formulario para <b>registrar una venta a mano</b>: mes, año, tasa, cliente, producto, cantidad, venta, costo y utilidad. Si ya existe una fila del mismo mes + cliente + producto, las cantidades se <b>suman</b> a la existente (no duplica).</p>
+</div>
+
+<div class="btn">
+  <h3>Gestionar Ventas <span class="tag nav">Página</span></h3>
+  <p>Tabla con <b>todos los registros de venta</b> (importados y manuales). Permite filtrar por mes, cliente y búsqueda por producto/código. Cada fila tiene botón de <b>Editar</b> (modal con todos los campos) y <b>Eliminar</b> (con confirmación).</p>
+</div>
+
+<div class="btn">
+  <h3>Descuentos <span class="tag nav">Página</span></h3>
+  <p>Igual que Gestionar Ventas pero muestra <b>solo las filas de descuento/devolución</b> (valores negativos o descripciones tipo DESCUENTO / FONDO PROMOCIONAL). Permite filtrarlas por mes, revisarlas, <b>editar montos o eliminarlas</b> (pide confirmación antes de borrar).</p>
+</div>
+
+<div class="btn">
+  <h3>Clientes <span class="tag nav">Página</span></h3>
+  <p>Lista de <b>todos los clientes</b> con su código, clase, nº de registros, unidades y ventas totales. Al <b>editar un cliente</b> (código, nombre o clase) el cambio se aplica a <b>todas sus ventas</b> automáticamente. Si escribes el código de otro cliente existente, ambos se fusionan.</p>
+</div>
+
+<h2><span class="num">3</span>ANÁLISIS</h2>
+
+<div class="btn">
+  <h3>Comparar <span class="tag nav">Página</span></h3>
+  <p>Compara la data cargada de un mes contra un archivo de reporte <b>sin importarlo</b>: sube el Excel y muestra qué productos coinciden, cuáles cambiaron, cuáles son nuevos en el archivo y cuáles faltan. Útil para validar un reporte antes de importarlo.</p>
+</div>
+
+<div class="btn">
+  <h3>Predicción IA <span class="tag nav">Página</span></h3>
+  <p>Muestra el histórico mensual de ventas más una <b>proyección de los próximos meses</b> generada con IA (horizonte de 1 a 6 meses). Se puede filtrar por cliente y producto, y alternar entre unidades y ventas.</p>
+</div>
+
+<div class="btn">
+  <h3>Chat IA <span class="tag nav">Página</span></h3>
+  <p><b>Chat en lenguaje natural</b> para hacer preguntas sobre los datos de ventas (ej. "¿cuánto vendió Farmatodo en septiembre?", "¿cuál fue mi producto más vendido?"). La IA consulta la base de datos y responde en la conversación.</p>
+</div>
+
+<h2><span class="num">4</span>IMPORTACIÓN</h2>
+
+<div class="note"><b>Orden recomendado al cargar un mes:</b> 1) Importar Excel → 2) Importar TXT (descuentos) → 3) Subir Facturas / Entrada Manual.</div>
+
+<div class="btn">
+  <h3>Importar Excel <span class="tag warn">Reemplaza el mes</span></h3>
+  <p>Importa el <b>reporte principal</b> <code>Venta_Productos_Clientes.xls</code> ("Reporte Venta de Productos por Cliente"). Detecta el mes del encabezado ("desde DD/MM/AAAA Hasta DD/MM/AAAA") y <b>reemplaza TODOS los datos de ese mes</b>: borra lo existente y carga lo nuevo (incluidos manuales y facturas de ese mes). Pide la tasa de cambio del mes.</p>
+</div>
+
+<div class="btn">
+  <h3>Importar Simple <span class="tag action">Solo agrega</span></h3>
+  <p>Para <b>hojas improvisadas</b> con columnas libres (Código, Producto, Cliente, Clase, Mes, Año, Tasa, Cantidad, Ventas). Se <b>suman</b> a la data existente marcadas como "improvisadas". Tasas vacías quedan en 0. Solo reemplaza improvisadas previas del mismo mes.</p>
+</div>
+
+<div class="btn">
+  <h3>Importar TXT <span class="tag action">Solo descuentos</span></h3>
+  <p>Importa el <b>reporte TXT de devoluciones</b> ("Transacciones Procesadas en Ventas — Devoluciones"). Detecta el mes del encabezado y <b>reemplaza únicamente las filas de descuento</b> de ese mes; las ventas normales quedan intactas. Solo inserta valores negativos y asocia cada bloque de productos a su transacción/cliente por el monto total.</p>
+</div>
+
+<div class="btn">
+  <h3>Subir Facturas <span class="tag action">Solo agrega</span></h3>
+  <p>Sube facturas individuales en Excel (formato <code>FACTURA - FORMATO.xlsx</code>), uno o varios archivos. Extrae cliente (por RIF), nº de factura, fecha de emisión y productos, y los <b>suma</b> a la data del mes correspondiente como entradas manuales. Si re-subes la misma factura, solo reemplaza <b>sus</b> productos — nunca borra el mes. Hereda la tasa del mes y la clase del cliente.</p>
+</div>
+
+<h2><span class="num">5</span>MES ACTUAL (solo con un mes filtrado)</h2>
+
+<div class="btn">
+  <h3>Editar Mes <span class="tag nav">Página</span></h3>
+  <p>Editor de las líneas del mes seleccionado: permite revisar y corregir cada registro del período (cantidades, ventas, costos). Incluye las entradas manuales y facturas del mes.</p>
+</div>
+
+<div class="btn">
+  <h3>Actualizar Tasa <span class="tag warn">Acción masiva</span></h3>
+  <p>Cambia la <b>tasa de cambio de TODOS los registros del mes seleccionado</b> a la vez, sin tocar cantidades ni montos.</p>
+</div>
+
+<h2><span class="num">6</span>ACCIONES GENERALES</h2>
+
+<div class="btn">
+  <h3>Pantalla Completa <span class="tag action">Vista</span></h3>
+  <p>Pone el navegador en pantalla completa y en el dashboard activa el modo <b>"solo gráficos"</b>: oculta menús, KPIs y tablas para mostrar únicamente las gráficas — ideal para presentaciones. Vuelve a pulsarse para salir.</p>
+</div>
+
+<div class="btn">
+  <h3>Cerrar Sesión <span class="tag warn">Acción</span></h3>
+  <p>Cierra la sesión del usuario actual y vuelve a la pantalla de login.</p>
+</div>
+
+<div class="tip"><b>Menú lateral:</b> en computadora puedes minimizarlo con la flecha « del borde superior (quedan solo íconos y ganas espacio); el estado se recuerda entre páginas. En celular/tablet se abre con el botón hamburguesa ☰.</div>
+
+<h2><span class="num">7</span>REGLA DE NEGOCIO CLAVE</h2>
+
+<table>
+  <tr><th>Tipo de fila</th><th>En Ventas ($/Bs)</th><th>En Unidades</th></tr>
+  <tr><td>Venta normal</td><td>Suma</td><td>Suma</td></tr>
+  <tr><td>Descuento / devolución (valores negativos)</td><td><b>Resta</b> del total monetario</td><td><b>No se cuenta</b> (aporta 0)</td></tr>
+  <tr><td>Factura manual / entrada manual</td><td>Suma</td><td>Suma</td></tr>
+</table>
+
+<div class="footer">SNC Pharma — Panel de Estadísticas Comerciales · Documento generado el 20/11/2026</div>
+
+</body>
+</html>
