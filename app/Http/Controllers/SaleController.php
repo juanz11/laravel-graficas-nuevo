@@ -410,7 +410,8 @@ class SaleController extends Controller
         try {
             $parsed = $this->parseReportFile($filePath);
             $reportDate = $parsed['report_date'];
-            $salesToInsert = array_map(function ($row) use ($exchangeRate) {
+            $salesToInsert = array_map(function ($row) use ($exchangeRate, $reportDate) {
+                $row['report_date'] = $reportDate;
                 $row['exchange_rate'] = $exchangeRate;
                 $row['created_at'] = now();
                 $row['updated_at'] = now();
@@ -421,7 +422,7 @@ class SaleController extends Controller
                 // Iniciar transacción de base de datos
                 DB::transaction(function () use ($reportDate, $salesToInsert) {
                     // Evitar duplicación de reportes para el mismo mes
-                    Sale::where('report_date', $reportDate)->delete();
+                    Sale::whereDate('report_date', $reportDate)->delete();
 
                     // Insertar registros en lotes de 500 para evitar límites del driver
                     $chunks = array_chunk($salesToInsert, 500);
@@ -574,6 +575,13 @@ class SaleController extends Controller
                 }
 
                 $prodDesc = trim((string)($row[$colMap['desc'] ?? 'B'] ?? ''));
+
+                // Filas reales siempre tienen descripción; sin ella es ruido
+                // de encabezados de página (RIF de la empresa, títulos, etc.)
+                if ($prodDesc === '') {
+                    continue;
+                }
+
                 $qtyVal = $row[$colMap['qty'] ?? 'C'] ?? '0';
                 $salesVal = $row[$colMap['sales'] ?? 'D'] ?? '0';
                 $costVal = $row[$colMap['cost'] ?? 'E'] ?? '0';

@@ -829,6 +829,53 @@ class SaleControllerTest extends TestCase
     }
 
     /** @test */
+    public function test_main_import_assigns_report_date_and_skips_page_header_rows()
+    {
+        $user = User::factory()->create();
+
+        // Fixture in the real "Venta_Productos_Clientes" format: company header,
+        // a repeated page header row (company RIF in col A, empty description)
+        // between product rows, "Datos del Cliente" + client, then product cols
+        // in A / C / J / L like the real file.
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->fromArray([
+            ['SNC PHARMA C.A'],
+            ['Av. Andres Eloy Blanco'],
+            ['J-29855562-9', 'Reporte Venta de Productos por Cliente'],
+            ['Reporte de operaciones desde 01/09/2026 Hasta 30/09/2026'],
+            [null],
+            ['Datos del Cliente', null, null, null, null, null, null, null, 'Clase'],
+            ['000202001', 'FARMATODO, C.A.', null, null, null, null, null, null, 'FARMATODO'],
+            ['Código', null, 'Descripción', null, null, null, null, null, null, 'Cantidad', null, 'Total Ventas'],
+            ['PROD_A', null, 'TERMISUR 80 MG', null, null, null, null, null, null, 100, null, 1000.50],
+            ['J-29855562-9', 'Reporte Venta de Productos por Cliente'], // page-break junk row
+            ['PROD_B', null, 'SITANIP 50 MG', null, null, null, null, null, null, 50, null, 500.25],
+        ], null, 'A1');
+
+        $path = tempnam(sys_get_temp_dir(), 'rep') . '.xlsx';
+        (new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet))->save($path);
+
+        $response = $this->actingAs($user)->post(route('sales.import'), [
+            'report_file' => new \Illuminate\Http\UploadedFile($path, 'reporte.xlsx', null, null, true),
+            'exchange_rate' => 887.87,
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        // Both real products imported with the detected month (Sep 2026)
+        $this->assertEquals(2, Sale::count());
+        $this->assertEquals(0, Sale::whereNull('report_date')->count());
+        $this->assertEquals('2026-09-01', Sale::first()->report_date->format('Y-m-d'));
+
+        // The junk header row was NOT imported as a product
+        $this->assertEquals(0, Sale::where('product_code', 'J-29855562-9')->count());
+        $this->assertTrue(Sale::whereNotNull('product_description')
+            ->where('product_description', '!=', '')
+            ->count() === 2);
+    }
+
+    /** @test */
     public function test_discounts_page_lists_only_discount_rows_filtered_by_month()
     {
         $user = User::factory()->create();
